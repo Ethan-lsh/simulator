@@ -1,4 +1,7 @@
 import numpy as np
+"""
+quantum gates
+"""
 
 X = np.array([[0, 1],
               [1, 0]])
