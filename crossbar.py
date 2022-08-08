@@ -2,7 +2,7 @@ from cross_sim import MakeCore
 from cross_sim import Parameters
 
 
-def set_params(params):
+def make_core():
     params = Parameters()
 
     error_rate = 0.0
