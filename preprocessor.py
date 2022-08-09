@@ -24,6 +24,7 @@ class Preprocessor:
 
     # get the amplitudes
     def get_amplitudes(self):
+        print('amplitudes\n', self.amplitudes)
         return self.amplitudes
 
     # calculate the stride value and initialize the offset value
@@ -33,15 +34,18 @@ class Preprocessor:
         else:
             print("The target index is larger than the qubits range")
 
-    # TODO: reshape the reordered_amplitudes to do the matrix-vector multiplication
     # qubit gate operation depends on the gate type
-    def quantum_gate_operation(self):
+    def quantum_gate_process(self):
         # make flatten amplitudes ndarray due to easily count the index
-        flatten_amplitudes = self.amplitudes.flat
+        flatten_amplitudes = self.amplitudes.flatten()
+        print(flatten_amplitudes)
 
         if self.gate_type == 'one_qubit_gate':
             # reorder all amplitudes without changing the index
-            reorder(flatten_amplitudes)
+            reordered_amplitudes = reorder(self.stride, flatten_amplitudes)
+
+            # return after reshape for making a pair of amplitudes, (2,1) vector
+            return reordered_amplitudes.reshape((-1, 2))
 
         elif self.gate_type == 'two_qubit_gate':
             # initialize the empty list to store the realized states
@@ -52,15 +56,15 @@ class Preprocessor:
 
             # convert the decimal control_index into the binary representation
             # if control qubit index is 1, the bin_control_index should be |010> (2nd => |100>)
-            bin_control_index = BitArray(uint=1<<self.control_index, length=self.num_qubits)
+            bin_control_index = BitArray(uint=1 << self.control_index, length=self.num_qubits)
 
             # find the realized amplitudes
-            for offset in range(0, 2**self.num_qubits):
+            for offset in range(0, 2 ** self.num_qubits):
                 # convert the decimal offset into the binary representation
                 bin_offset = BitArray(uint=offset, length=self.num_qubits)
 
                 # check the offset has the control index as 1
-                # ex) |010> & |000>, |010> & |001>, |010> & |010>, ...
+                # ex) |010> & |000> = 0, |010> & |001> = 0, |010> & |010> = 1, ...
                 enable = bin_control_index & bin_offset
 
                 # when enable == 1, it means the qubit of control index on offset is '1' named 'realized'
@@ -76,7 +80,10 @@ class Preprocessor:
                     print("Cannot check the realized states")
 
             # reorder the realized amplitudes
-            reorder(self.stride, flatten_amplitudes)
+            reordered_amplitudes = reorder(self.stride, flatten_amplitudes)
+
+            # return after reshape for making a pair of amplitudes, (2,1) vector
+            return reordered_amplitudes.reshape((-1, 2))
 
         else:
             print("No matched gate type!")
@@ -85,13 +92,14 @@ class Preprocessor:
 # reorder the amplitudes of each qubit state according to the stride value
 def reorder(stride, flatten_amplitudes):
     # initialize the zero reordered_amplitudes numpy array same size as amplitudes
-    reordered_amplitudes = np.zeros(flatten_amplitudes.size)
+    reordered = np.zeros(flatten_amplitudes.size)
 
     # empty list to check the selected index
     selected_index = []
 
     # change the value
-    for index, amplitude in np.ndenumerate(flatten_amplitudes):
+    for indexes, amplitude in np.ndenumerate(flatten_amplitudes):
+        index = int(indexes[0])  # indexes is tuple (0,)
         if index not in selected_index:
             # add the unselected index
             selected_index.append(index)
@@ -105,8 +113,8 @@ def reorder(stride, flatten_amplitudes):
             lower_state = flatten_amplitudes[pair_index]
 
             # store the pair qubit states
-            reordered_amplitudes[index] = upper_state
-            reordered_amplitudes[index + 1] = lower_state
+            reordered[index] = upper_state
+            reordered[index + 1] = lower_state
 
         elif index in selected_index:
             continue
@@ -114,3 +122,5 @@ def reorder(stride, flatten_amplitudes):
         else:
             print("Index error!")
 
+    print(selected_index)
+    return reordered
