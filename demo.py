@@ -38,13 +38,13 @@ def gate(gate_type, target, amplitudes, control=0):
         print('no matched gate')
 
 
-if __name__ == '__main__':
-    amplitudes = [1, 0, 0, 0, 0, 0, 0, 0]
 
-    reordered_amplitudes = [0] * len(amplitudes)
+amplitudes = [1, 0, 0, 0, 0, 0, 0, 0]
 
-    neural_core = cb.make_core()
+reordered_amplitudes = [0] * len(amplitudes)
 
-    type = 'hadamard'
+neural_core = cb.make_core()
 
-    gate(type, 0, amplitudes)
+type = 'hadamard'
+
+gate(type, 0, amplitudes)
