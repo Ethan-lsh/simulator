@@ -1,6 +1,5 @@
 import numpy as np
 
-# FIXME: make enum class for quantum gate
 
 X = np.array([[0, 1],
               [1, 0]])
