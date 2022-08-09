@@ -38,7 +38,7 @@ class Preprocessor:
     def quantum_gate_process(self):
         # make flatten amplitudes ndarray due to easily count the index
         flatten_amplitudes = self.amplitudes.flatten()
-        print(flatten_amplitudes)
+        print('flatten', flatten_amplitudes)
 
         if self.gate_type == 'one_qubit_gate':
             # reorder all amplitudes without changing the index
@@ -64,23 +64,25 @@ class Preprocessor:
                 bin_offset = BitArray(uint=offset, length=self.num_qubits)
 
                 # check the offset has the control index as 1
-                # ex) |010> & |000> = 0, |010> & |001> = 0, |010> & |010> = 1, ...
+                # ex) |010> & |000> = 0, |010> & |001> = 0, |010> & |010> > 0, ...
                 enable = bin_control_index & bin_offset
 
                 # when enable == 1, it means the qubit of control index on offset is '1' named 'realized'
-                if enable.uint == 1:
+                if enable.uint > 0:
                     # add the realized amplitudes
                     realized_amplitudes.append(flatten_amplitudes[offset])
+                    # print('i', offset)
 
                 elif enable.uint == 0:
                     # add the unrealized amplitudes
                     unrealized_amplitudes.append(flatten_amplitudes[offset])
+                    # print('b', unrealized_amplitudes)
 
                 else:
                     print("Cannot check the realized states")
 
             # reorder the realized amplitudes
-            reordered_amplitudes = reorder(self.stride, flatten_amplitudes)
+            reordered_amplitudes = reorder(self.stride, np.array(realized_amplitudes))
 
             # return after reshape for making a pair of amplitudes, (2,1) vector
             return reordered_amplitudes.reshape((-1, 2))
@@ -89,13 +91,14 @@ class Preprocessor:
             print("No matched gate type!")
 
 
+# empty list to check the selected index
+selected_index = []
+
+
 # reorder the amplitudes of each qubit state according to the stride value
 def reorder(stride, flatten_amplitudes):
     # initialize the zero reordered_amplitudes numpy array same size as amplitudes
     reordered = np.zeros(flatten_amplitudes.size)
-
-    # empty list to check the selected index
-    selected_index = []
 
     # change the value
     for indexes, amplitude in np.ndenumerate(flatten_amplitudes):
@@ -108,7 +111,8 @@ def reorder(stride, flatten_amplitudes):
             upper_state = amplitude
 
             # store the lower state (index + stride)
-            pair_index = index + stride
+            # FIXME: make two case for both one-qubit and two-qubit
+            pair_index = index + stride//2
             selected_index.append(pair_index)
             lower_state = flatten_amplitudes[pair_index]
 
@@ -122,5 +126,5 @@ def reorder(stride, flatten_amplitudes):
         else:
             print("Index error!")
 
-    print(selected_index)
+    print('selected indexes', selected_index)
     return reordered
