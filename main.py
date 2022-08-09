@@ -5,7 +5,6 @@ import preprocessor as pre
 import crossbar as cb
 
 # TODO: Expand the simulation environment for a many of quantum logic gate
-# TODO: Create a function that restores the rearranged array to its original location
 
 """
 3-qubits amplitudes
@@ -18,6 +17,16 @@ amplitudes = np.array([[1, 0], [0, 0], [0, 0], [0, 0]])
 xbar_array = cb.make_core()
 
 stride_unit = pre.Preprocessor()
+
+
+# restores the rearranged array to its original location
+def restore(selected_index, xbar_result):
+    # make the empty array for restored amplitudes
+    restored_amplitudes = list(xbar_result.size)
+
+    # TODO: iterate the xbar_result and assign the xbar result into the restored amplitudes at the corresponding index
+    for i in xbar_result:
+
 
 if __name__ == "__main__":
     # set the matrix on crossbar
@@ -41,4 +50,3 @@ if __name__ == "__main__":
     # matrix-vector multiplication
     xbar_output = xbar_array.run_xbar_mvm(qubit_state_vector[0, :])
     print('test', xbar_output)
-

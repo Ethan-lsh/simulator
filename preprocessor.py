@@ -42,7 +42,7 @@ class Preprocessor:
 
         if self.gate_type == 'one_qubit_gate':
             # reorder all amplitudes without changing the index
-            reordered_amplitudes = reorder(self.stride, flatten_amplitudes)
+            reordered_amplitudes = reorder(self.stride, self.gate_type, flatten_amplitudes)
 
             # return after reshape for making a pair of amplitudes, (2,1) vector
             return reordered_amplitudes.reshape((-1, 2))
@@ -82,7 +82,7 @@ class Preprocessor:
                     print("Cannot check the realized states")
 
             # reorder the realized amplitudes
-            reordered_amplitudes = reorder(self.stride, np.array(realized_amplitudes))
+            reordered_amplitudes = reorder(self.stride, self.gate_type, np.array(realized_amplitudes))
 
             # return after reshape for making a pair of amplitudes, (2,1) vector
             return reordered_amplitudes.reshape((-1, 2))
@@ -96,7 +96,7 @@ selected_index = []
 
 
 # reorder the amplitudes of each qubit state according to the stride value
-def reorder(stride, flatten_amplitudes):
+def reorder(stride, gate_type, flatten_amplitudes):
     # initialize the zero reordered_amplitudes numpy array same size as amplitudes
     reordered = np.zeros(flatten_amplitudes.size)
 
@@ -112,7 +112,14 @@ def reorder(stride, flatten_amplitudes):
 
             # store the lower state (index + stride)
             # FIXME: make two case for both one-qubit and two-qubit
-            pair_index = index + stride//2
+            pair_index = 0
+            if gate_type == 'one_qubit_gate':
+                pair_index = index + stride
+            elif gate_type == 'two_qubit_gate':
+                pair_index = index + stride//2
+            else:
+                print('stride error')
+
             selected_index.append(pair_index)
             lower_state = flatten_amplitudes[pair_index]
 
