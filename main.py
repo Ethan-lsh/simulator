@@ -32,8 +32,16 @@ def quantum_simulation(qubits, qpu, stride_unit, gate_info, amplitudes):
         reordered, r_index, _ = stride_unit.quantum_gate_process()
 
         # matrix-vector multiplication
-        result = qpu.run_xbar_mvm(reordered)
-        print('result', result)
+        qpu_result = qpu.run_xbar_mvm(reordered)
+        print('result', qpu_result)
+
+        # make empty restored amplitudes list
+        restored_amplitudes = []
+
+        for i, val in enumerate(qpu_result):
+            restored_amplitudes.insert(r_index[i], val)
+
+        print('restored', restored_amplitudes)
 
     elif gate_info['gate_type'] == 'two_qubit_gate':
         weight = block_diag(*([gate_info['quantum_gate']] * (qubits - 1)))
@@ -41,11 +49,22 @@ def quantum_simulation(qubits, qpu, stride_unit, gate_info, amplitudes):
         qpu.set_matrix(weight)
 
         # reordered amplitudes, realized index, unrealized index
-        reordered, r_index, u_index = stride_unit.quantum_gate_process()
+        reordered, r_index, un_reordered, u_index = stride_unit.quantum_gate_process()
 
         # matrix-vector multiplication
-        result = qpu.run_xbar_mvm(reordered)
-        print('result', result)
+        qpu_result = qpu.run_xbar_mvm(reordered)
+        print('result', qpu_result)
+
+        # make empty restored amplitudes list
+        restored_amplitudes = []
+
+        # concatenate the index and amplitudes of realized and unrealized states
+        index = r_index + u_index
+
+        for i, val in enumerate(np.concatenate((qpu_result, un_reordered))):
+            restored_amplitudes.insert(index[i], val)
+
+        print('restored', restored_amplitudes)
 
 
 if __name__ == "__main__":
@@ -65,6 +84,6 @@ if __name__ == "__main__":
     """
     amplitudes = np.array([[1, 0], [0, 0], [0, 0], [0, 0]])
 
-    gate_info = {"control_qubit": 0, "target_qubit": 1, "quantum_gate": gate.X, "gate_type": 'two_qubit_gate'}
+    gate_info = {"control_qubit": 0, "target_qubit": 1, "quantum_gate": gate.X, "gate_type": 'one_qubit_gate'}
 
     quantum_simulation(qubits, qpu, stride_unit, gate_info, amplitudes)

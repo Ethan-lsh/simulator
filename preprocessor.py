@@ -51,8 +51,8 @@ class Preprocessor:
             # initialize the empty list to store the realized states
             realized_amplitudes = []
 
-            # initialize the empty list to store the unrealized states
-            unrealized_amplitudes = []
+            # initialize the empty np_arr to store the unrealized states
+            unrealized_amplitudes = np.array([])
 
             # convert the decimal control_index into the binary representation
             # if control qubit index is 1, the bin_control_index should be |010> (2nd => |100>)
@@ -79,8 +79,9 @@ class Preprocessor:
                 elif enable.uint == 0:
                     unrealized_index.append(offset)
 
-                    # add the unrealized amplitudes
-                    unrealized_amplitudes.append(flatten_amplitudes[offset])
+                    # append the unrealized amplitudes
+                    np.append(unrealized_amplitudes, flatten_amplitudes[offset])
+                    # unrealized_amplitudes.append(flatten_amplitudes[offset])
                     # print('b', unrealized_amplitudes)
 
                 else:
@@ -91,7 +92,7 @@ class Preprocessor:
             reordered_amplitudes, realized_index = reorder(self.stride, self.gate_type, np.array(realized_amplitudes))
 
             # return after reshape for making a pair of amplitudes, (2,1) vector
-            return reordered_amplitudes.reshape((-1, 2)), realized_index, unrealized_index
+            return reordered_amplitudes.reshape((-1, 2)), realized_index, unrealized_amplitudes, unrealized_index
 
         else:
             print("No matched gate type!")
