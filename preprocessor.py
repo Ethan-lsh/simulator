@@ -20,7 +20,7 @@ class Preprocessor:
 
     # set the amplitudes
     def set_amplitudes(self, amplitudes):
-        self.amplitudes = amplitudes
+        self.amplitudes = np.array(amplitudes)
 
     # get the amplitudes
     def get_amplitudes(self):
@@ -52,7 +52,7 @@ class Preprocessor:
             realized_amplitudes = []
 
             # initialize the empty np_arr to store the unrealized states
-            unrealized_amplitudes = np.array([])
+            unrealized_amplitudes = []
 
             # convert the decimal control_index into the binary representation
             # if control qubit index is 1, the bin_control_index should be |010> (2nd => |100>)
@@ -80,8 +80,9 @@ class Preprocessor:
                     unrealized_index.append(offset)
 
                     # append the unrealized amplitudes
-                    np.append(unrealized_amplitudes, flatten_amplitudes[offset])
-                    # unrealized_amplitudes.append(flatten_amplitudes[offset])
+                    # np.append(unrealized_amplitudes, np.array(flatten_amplitudes[offset]))
+                    # print('tsest', unrealized_amplitudes)
+                    unrealized_amplitudes.append(flatten_amplitudes[offset])
                     # print('b', unrealized_amplitudes)
 
                 else:

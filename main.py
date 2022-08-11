@@ -16,7 +16,7 @@ def quantum_simulation(qubits, qpu, stride_unit, gate_info, amplitudes):
     # set the amplitudes in stride_unit
     stride_unit.set_amplitudes(amplitudes)
 
-    stride_unit.get_amplitudes()
+    # stride_unit.get_amplitudes()
 
     # calculate the stride value
     stride_unit.cal_stride()
@@ -42,6 +42,7 @@ def quantum_simulation(qubits, qpu, stride_unit, gate_info, amplitudes):
             restored_amplitudes.insert(r_index[i], val)
 
         print('restored', restored_amplitudes)
+        return restored_amplitudes
 
     elif gate_info['gate_type'] == 'two_qubit_gate':
         weight = block_diag(*([gate_info['quantum_gate']] * (qubits - 1)))
@@ -53,7 +54,7 @@ def quantum_simulation(qubits, qpu, stride_unit, gate_info, amplitudes):
 
         # matrix-vector multiplication
         qpu_result = qpu.run_xbar_mvm(reordered)
-        print('result', qpu_result)
+        # print('result', qpu_result)
 
         # make empty restored amplitudes list
         restored_amplitudes = []
@@ -65,6 +66,7 @@ def quantum_simulation(qubits, qpu, stride_unit, gate_info, amplitudes):
             restored_amplitudes.insert(index[i], val)
 
         print('restored', restored_amplitudes)
+        return restored_amplitudes
 
 
 if __name__ == "__main__":
@@ -82,8 +84,12 @@ if __name__ == "__main__":
     ex) amplitudes[0] = (|000>, |001>)
     upper(amplitudes[0][0]) = |000>
     """
-    amplitudes = np.array([[1, 0], [0, 0], [0, 0], [0, 0]])
+    amplitudes = [[1, 0], [0, 0], [0, 0], [0, 0]]
 
-    gate_info = {"control_qubit": 0, "target_qubit": 1, "quantum_gate": gate.X, "gate_type": 'one_qubit_gate'}
+    gate_info_first = {"control_qubit": 0, "target_qubit": 0, "quantum_gate": gate.H,
+                       "gate_type": 'one_qubit_gate'}  # Pauli-X
+    gate_info_second = {"control_qubit": 0, "target_qubit": 1, "quantum_gate": gate.X,
+                        "gate_type": 'two_qubit_gate'}  # CNOT
 
-    quantum_simulation(qubits, qpu, stride_unit, gate_info, amplitudes)
+    first_result = quantum_simulation(qubits, qpu, stride_unit, gate_info_first, amplitudes)
+    second_result = quantum_simulation(qubits, qpu, stride_unit, gate_info_second, np.array(first_result))
