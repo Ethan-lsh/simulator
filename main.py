@@ -23,6 +23,7 @@ def quantum_simulation(qubits, qpu, stride_unit, gate_info, amplitudes):
 
     if gate_info['gate_type'] == 'one_qubit_gate':
         # make the diagonal weight
+        # FIXME
         weight = block_diag(*([gate_info['quantum_gate']] * (qubits + 1)))
 
         # set the matrix on crossbar
@@ -41,7 +42,9 @@ def quantum_simulation(qubits, qpu, stride_unit, gate_info, amplitudes):
         for i, val in enumerate(qpu_result):
             restored_amplitudes.insert(r_index[i], val)
 
+        print('r_index', r_index)
         print('restored', restored_amplitudes)
+        print('\n')
         return restored_amplitudes
 
     elif gate_info['gate_type'] == 'two_qubit_gate':
@@ -51,10 +54,11 @@ def quantum_simulation(qubits, qpu, stride_unit, gate_info, amplitudes):
 
         # reordered amplitudes, realized index, unrealized index
         reordered, r_index, un_reordered, u_index = stride_unit.quantum_gate_process()
+        print('u_index', u_index)
 
         # matrix-vector multiplication
         qpu_result = qpu.run_xbar_mvm(reordered)
-        # print('result', qpu_result)
+        print('result', qpu_result)
 
         # make empty restored amplitudes list
         restored_amplitudes = []
@@ -65,7 +69,9 @@ def quantum_simulation(qubits, qpu, stride_unit, gate_info, amplitudes):
         for i, val in enumerate(np.concatenate((qpu_result, un_reordered))):
             restored_amplitudes.insert(index[i], val)
 
+        print('index', index)
         print('restored', restored_amplitudes)
+        print('\n')
         return restored_amplitudes
 
 
@@ -77,19 +83,28 @@ if __name__ == "__main__":
     stride_unit = pre.Preprocessor()
 
     # number of qubits
-    qubits = 3
+    qubits = 4
 
     """
     3-qubits amplitudes
     ex) amplitudes[0] = (|000>, |001>)
     upper(amplitudes[0][0]) = |000>
     """
-    amplitudes = [[1, 0], [0, 0], [0, 0], [0, 0]]
+    amplitudes = [[1, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]
 
-    gate_info_first = {"control_qubit": 0, "target_qubit": 0, "quantum_gate": gate.H,
-                       "gate_type": 'one_qubit_gate'}  # Pauli-X
-    gate_info_second = {"control_qubit": 0, "target_qubit": 1, "quantum_gate": gate.X,
+    gate_info_first = {"control_qubit": 0, "target_qubit": 0, "quantum_gate": gate.X,
+                       "gate_type": 'one_qubit_gate'}  # X
+    gate_info_second = {"control_qubit": 0, "target_qubit": 1, "quantum_gate": gate.H,
+                        "gate_type": 'one_qubit_gate'}  # H
+    gate_info_third = {"control_qubit": 0, "target_qubit": 2, "quantum_gate": gate.X,
                         "gate_type": 'two_qubit_gate'}  # CNOT
+    gate_info_fourth = {"control_qubit": 0, "target_qubit": 3, "quantum_gate": gate.Z,
+                       "gate_type": 'one_qubit_gate'}  # Y
+    gate_info_fifth = {"control_qubit": 0, "target_qubit": 1, "quantum_gate": gate.X,
+                       "gate_type": 'two_qubit_gate'}  # CNOT
 
     first_result = quantum_simulation(qubits, qpu, stride_unit, gate_info_first, amplitudes)
-    second_result = quantum_simulation(qubits, qpu, stride_unit, gate_info_second, np.array(first_result))
+    second_result = quantum_simulation(qubits, qpu, stride_unit, gate_info_second, first_result)
+    third_result = quantum_simulation(qubits, qpu, stride_unit, gate_info_third, second_result)
+    fourth_result = quantum_simulation(qubits, qpu, stride_unit, gate_info_fourth, third_result)
+    fifth_result = quantum_simulation(qubits, qpu, stride_unit, gate_info_fifth, fourth_result)
