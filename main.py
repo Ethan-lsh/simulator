@@ -24,7 +24,7 @@ def quantum_simulation(qubits, qpu, stride_unit, gate_info, amplitudes):
     if gate_info['gate_type'] == 'one_qubit_gate':
         # make the diagonal weight
         # FIXME
-        weight = block_diag(*([gate_info['quantum_gate']] * (qubits + 1)))
+        weight = block_diag(*([gate_info['quantum_gate']] * (2**(qubits-1))))
 
         # set the matrix on crossbar
         qpu.set_matrix(weight)
@@ -48,7 +48,7 @@ def quantum_simulation(qubits, qpu, stride_unit, gate_info, amplitudes):
         return restored_amplitudes
 
     elif gate_info['gate_type'] == 'two_qubit_gate':
-        weight = block_diag(*([gate_info['quantum_gate']] * (qubits - 1)))
+        weight = block_diag(*([gate_info['quantum_gate']] * (2**(qubits - 2))))
 
         qpu.set_matrix(weight)
 
@@ -96,10 +96,10 @@ if __name__ == "__main__":
                        "gate_type": 'one_qubit_gate'}  # X
     gate_info_second = {"control_qubit": 0, "target_qubit": 1, "quantum_gate": gate.H,
                         "gate_type": 'one_qubit_gate'}  # H
-    gate_info_third = {"control_qubit": 0, "target_qubit": 2, "quantum_gate": gate.X,
-                        "gate_type": 'two_qubit_gate'}  # CNOT
-    gate_info_fourth = {"control_qubit": 0, "target_qubit": 3, "quantum_gate": gate.Z,
-                       "gate_type": 'one_qubit_gate'}  # Y
+    gate_info_third = {"control_qubit": 0, "target_qubit": 1, "quantum_gate": gate.X,
+                        "gate_type": 'one_qubit_gate'}  # CNOT
+    gate_info_fourth = {"control_qubit": 0, "target_qubit": 1, "quantum_gate": gate.X,
+                       "gate_type": 'two_qubit_gate'}  # Y
     gate_info_fifth = {"control_qubit": 0, "target_qubit": 1, "quantum_gate": gate.X,
                        "gate_type": 'two_qubit_gate'}  # CNOT
 
@@ -107,4 +107,4 @@ if __name__ == "__main__":
     second_result = quantum_simulation(qubits, qpu, stride_unit, gate_info_second, first_result)
     third_result = quantum_simulation(qubits, qpu, stride_unit, gate_info_third, second_result)
     fourth_result = quantum_simulation(qubits, qpu, stride_unit, gate_info_fourth, third_result)
-    fifth_result = quantum_simulation(qubits, qpu, stride_unit, gate_info_fifth, fourth_result)
+    # fifth_result = quantum_simulation(qubits, qpu, stride_unit, gate_info_fifth, fourth_result)
