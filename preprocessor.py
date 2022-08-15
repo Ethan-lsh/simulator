@@ -125,15 +125,19 @@ def reorder(stride, gate_type, flatten_amplitudes, realized_index=None):
             if gate_type == 'one_qubit_gate':
                 pair_index = index + stride
             elif gate_type == 'two_qubit_gate':
+                # FIXME: two_qubit_gate는 index가 아닌 값으로 stride 정렬하도록 수정하기
                 pair_index = index + stride // 2
 
-                # store the pair of realized index
-                reordered_index.append(realized_index[index])
-                reordered_index.append(realized_index[pair_index])
+                if pair_index not in reordered_index:
+                    # store the pair of realized index
+                    reordered_index.append(realized_index[index])
+                    reordered_index.append(realized_index[pair_index])
             else:
                 print('stride error')
 
-            stride_index.append(pair_index)
+            if pair_index not in stride_index:
+                stride_index.append(pair_index)
+
             lower_state = flatten_amplitudes[pair_index]
 
             # store the pair of reordered amplitudes
