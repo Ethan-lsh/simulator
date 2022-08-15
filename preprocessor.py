@@ -105,7 +105,7 @@ class Preprocessor:
 def reorder(stride, gate_type, flatten_amplitudes, realized_index=None):
     # make the empty index list for realized amplitudes
     stride_index = []
-    reordered_index = []
+    # reordered_offset = []
 
     # initialize the zero reordered_amplitudes numpy array same size as amplitudes
     reordered = []
@@ -125,18 +125,15 @@ def reorder(stride, gate_type, flatten_amplitudes, realized_index=None):
             if gate_type == 'one_qubit_gate':
                 pair_index = index + stride
             elif gate_type == 'two_qubit_gate':
-                # FIXME: two_qubit_gate는 index가 아닌 값으로 stride 정렬하도록 수정하기
-                pair_index = index + stride // 2
-
-                if pair_index not in reordered_index:
-                    # store the pair of realized index
-                    reordered_index.append(realized_index[index])
-                    reordered_index.append(realized_index[pair_index])
+                realized_state = realized_index[index]
+                pair_index = realized_index.index(realized_state+stride)
             else:
                 print('stride error')
 
             if pair_index not in stride_index:
                 stride_index.append(pair_index)
+            else:
+                continue
 
             lower_state = flatten_amplitudes[pair_index]
 
@@ -152,4 +149,4 @@ def reorder(stride, gate_type, flatten_amplitudes, realized_index=None):
 
     print('stride_index', stride_index)
     # return the reordered amplitudes, realized_index together
-    return (np.array(reordered), stride_index) if gate_type == 'one_qubit_gate' else (np.array(reordered), reordered_index)
+    return np.array(reordered), stride_index
