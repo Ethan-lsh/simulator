@@ -1,8 +1,12 @@
-import numpy as np
 from scipy.linalg import block_diag
+from qiskit.circuit.random import random_circuit
+from qiskit import QuantumCircuit
+from qiskit.utils import *
+import numpy as np
 import gate
 import preprocessor as pre
 import crossbar as cb
+import checker as ch
 
 
 # TODO: make 'function restore' to restore the original order of amplitudes
@@ -23,7 +27,6 @@ def quantum_simulation(qubits, qpu, stride_unit, gate_info, amplitudes):
 
     if gate_info['gate_type'] == 'one_qubit_gate':
         # make the diagonal weight
-        # FIXME
         weight = block_diag(*([gate_info['quantum_gate']] * (2**(qubits-1))))
 
         # set the matrix on crossbar
@@ -81,8 +84,15 @@ if __name__ == "__main__":
     # make the stride unit
     stride_unit = pre.Preprocessor()
 
+    ############################
+    ### Quantumcircuit setup ###
+    ############################
+
+    # load the QuantumCircuit from qasm file
+    qc = QuantumCircuit.from_qasm_file('./qasm/small/iswap.qasm')
+
     # number of qubits
-    qubits = 3
+    num_qubits = qc.num_qubits
 
     """
     3-qubits amplitudes
@@ -90,21 +100,21 @@ if __name__ == "__main__":
     upper(amplitudes[0][0]) = |000>
     """
     # FIXME: automatically generate the qubit states according to the number of qubits
-    amplitudes = [[1, 0], [0, 0], [0, 0], [0, 0]]
+    # amplitudes = [[1+0j, 0+0j], [0+0j, 0+0j], [0+0j, 0+0j], [0+0j, 0+0j]]
+    amplitudes = np.zeros((-1, 2), dtype=np.npy_complex8)
 
     # FIXME: read the gate information from qasm file
-    gate_info_first = {"control_qubit": 0, "target_qubit": 1, "quantum_gate": gate.X,
+    gate_info_first = {"control_qubit": 0, "target_qubit": 1, "quantum_gate": gate.Y,
                        "gate_type": 'one_qubit_gate'}  # X(1)
     gate_info_second = {"control_qubit": 1, "target_qubit": 0, "quantum_gate": gate.X,
                         "gate_type": 'two_qubit_gate'}  # H(1)
-    # gate_info_third = {"control_qubit": 0, "target_qubit": 1, "quantum_gate": gate.X,
-    #                     "gate_type": 'one_qubit_gate'}  # X(1)
-    # gate_info_fourth = {"control_qubit": 0, "target_qubit": 1, "quantum_gate": gate.X,
-    #                    "gate_type": 'two_qubit_gate'}  # CNOT(0,2)
-
+    gate_info_third = {"control_qubit": 0, "target_qubit": 1, "quantum_gate": gate.H,
+                        "gate_type": 'one_qubit_gate'}  # X(1)
+    gate_info_fourth = {"control_qubit": 1, "target_qubit": 2, "quantum_gate": gate.X,
+                       "gate_type": 'two_qubit_gate'}  # CNOT(0,2)
 
     # FIXME: make repeat function
     first_result = quantum_simulation(qubits, qpu, stride_unit, gate_info_first, amplitudes)
     second_result = quantum_simulation(qubits, qpu, stride_unit, gate_info_second, first_result)
-    # third_result = quantum_simulation(qubits, qpu, stride_unit, gate_info_third, second_result)
-    # fourth_result = quantum_simulation(qubits, qpu, stride_unit, gate_info_fourth, third_result)
+    third_result = quantum_simulation(qubits, qpu, stride_unit, gate_info_third, second_result)
+    fourth_result = quantum_simulation(qubits, qpu, stride_unit, gate_info_fourth, third_result)

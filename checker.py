@@ -4,21 +4,22 @@ Module for calculate execution time and clarify the quantum gate type
 
 
 def calculate_exec_time(gate_type, num_of_qubits, num_of_qpus, precision=8):
-    L_read = 0.841  # nanosecond
-    L_write = 10.20  # nanosecond
-    crossbar_size = 2 ** num_of_qubits * 2 ** num_of_qubits
+    L_read = 0.841  # Read latency (nanosecond)
+    L_write = 10.20  # Write latency (nanosecond)
+    crossbar_capacity = 2 ** num_of_qubits * 2 ** num_of_qubits  # rows x columns
+    N_burst = 64  # 64bytes burst write
 
-    T_load = 2 ** num_of_qubits * L_write
+    T_load = (crossbar_capacity / N_burst) * L_write * num_of_qpus   # write time
 
-    T_mvm = 0
+    T_extract = 0  # read time
     if gate_type == 'one_qubit_gate':
-        T_mvm = (2 ** num_of_qubits * 2) * L_read
+        T_extract = 2 ** num_of_qubits * L_read
     elif gate_type == 'two_qubit_gate':
-        T_mvm = (2 ** num_of_qubits * 2) * L_read / 2
+        T_extract = 2 ** num_of_qubits * L_read / 2
     else:
         print('No matched gate type')
 
-    T_exec = T_load + T_mvm
+    T_exec = T_load + T_extract
 
 
 def clarify_gate_type(qc):
