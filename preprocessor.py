@@ -20,7 +20,7 @@ class Preprocessor:
 
     # set the amplitudes
     def set_amplitudes(self, amplitudes):
-        self.amplitudes = np.array(amplitudes)
+        self.amplitudes = amplitudes
 
     # get the amplitudes
     def get_amplitudes(self):

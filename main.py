@@ -3,10 +3,13 @@ from qiskit.circuit.random import random_circuit
 from qiskit import QuantumCircuit
 from qiskit.utils import *
 import numpy as np
-import gate
+
+import checker
+from qgate import quantum_gate
 import preprocessor as pre
 import crossbar as cb
 import checker as ch
+import math
 
 
 # TODO: make 'function restore' to restore the original order of amplitudes
@@ -27,7 +30,8 @@ def quantum_simulation(qubits, qpu, stride_unit, gate_info, amplitudes):
 
     if gate_info['gate_type'] == 'one_qubit_gate':
         # make the diagonal weight
-        weight = block_diag(*([gate_info['quantum_gate']] * (2**(qubits-1))))
+        # weight = block_diag(*([gate_info['quantum_gate']] * (2**(qubits-1))))
+        weight = block_diag(*([quantum_gate[gate_info['quantum_gate']]] * (2**(qubits-1))))
 
         # set the matrix on crossbar
         qpu.set_matrix(weight)
@@ -47,10 +51,11 @@ def quantum_simulation(qubits, qpu, stride_unit, gate_info, amplitudes):
 
         print('restored', restored_amplitudes)
         print('\n')
-        return restored_amplitudes
+        return np.array(restored_amplitudes)
 
     elif gate_info['gate_type'] == 'two_qubit_gate':
-        weight = block_diag(*([gate_info['quantum_gate']] * (2**(qubits - 2))))
+        # weight = block_diag(*([gate_info['quantum_gate']] * (2**(qubits - 2))))
+        weight = block_diag(*([quantum_gate[gate_info['quantum_gate']]] * (2**(qubits-1))))
 
         qpu.set_matrix(weight)
 
@@ -71,10 +76,10 @@ def quantum_simulation(qubits, qpu, stride_unit, gate_info, amplitudes):
         for i, val in enumerate(np.concatenate((qpu_result, un_reordered))):
             restored_amplitudes.insert(index[i], val)
 
-        print('index', index)
+        # print('index', index)
         print('restored', restored_amplitudes)
         print('\n')
-        return restored_amplitudes
+        return np.array(restored_amplitudes)
 
 
 if __name__ == "__main__":
@@ -89,7 +94,7 @@ if __name__ == "__main__":
     ############################
 
     # load the QuantumCircuit from qasm file
-    qc = QuantumCircuit.from_qasm_file('./qasm/small/iswap.qasm')
+    qc = QuantumCircuit.from_qasm_file('./qasm/small/test1.qasm')
 
     # number of qubits
     num_qubits = qc.num_qubits
@@ -99,22 +104,17 @@ if __name__ == "__main__":
     ex) amplitudes[0] = (|000>, |001>)
     upper(amplitudes[0][0]) = |000>
     """
-    # FIXME: automatically generate the qubit states according to the number of qubits
-    # amplitudes = [[1+0j, 0+0j], [0+0j, 0+0j], [0+0j, 0+0j], [0+0j, 0+0j]]
-    amplitudes = np.zeros((-1, 2), dtype=np.npy_complex8)
+    # amplitudes = [[1+0j], [0+0j], [0+0j], [0+0j], [0+0j], ..., [0+0j]]
+    amplitudes = np.zeros(2**num_qubits, dtype=np.complex64).reshape((-1, 1))
+    amplitudes[0][0] = 1 + 0j
 
-    # FIXME: read the gate information from qasm file
-    gate_info_first = {"control_qubit": 0, "target_qubit": 1, "quantum_gate": gate.Y,
-                       "gate_type": 'one_qubit_gate'}  # X(1)
-    gate_info_second = {"control_qubit": 1, "target_qubit": 0, "quantum_gate": gate.X,
-                        "gate_type": 'two_qubit_gate'}  # H(1)
-    gate_info_third = {"control_qubit": 0, "target_qubit": 1, "quantum_gate": gate.H,
-                        "gate_type": 'one_qubit_gate'}  # X(1)
-    gate_info_fourth = {"control_qubit": 1, "target_qubit": 2, "quantum_gate": gate.X,
-                       "gate_type": 'two_qubit_gate'}  # CNOT(0,2)
+    # quantum gate information list
+    gate_info_list = checker.clarify_gate_type(qc)
 
-    # FIXME: make repeat function
-    first_result = quantum_simulation(qubits, qpu, stride_unit, gate_info_first, amplitudes)
-    second_result = quantum_simulation(qubits, qpu, stride_unit, gate_info_second, first_result)
-    third_result = quantum_simulation(qubits, qpu, stride_unit, gate_info_third, second_result)
-    fourth_result = quantum_simulation(qubits, qpu, stride_unit, gate_info_fourth, third_result)
+    # emulate 'do-while'
+    intermediate_result = quantum_simulation(num_qubits, qpu, stride_unit, gate_info_list[0], amplitudes)
+    try:
+        for gate in gate_info_list[1:]:
+            intermediate_result = quantum_simulation(num_qubits, qpu, stride_unit, gate, intermediate_result)
+    except StopIteration:
+        quantum_simulation_result = intermediate_result
