@@ -4,15 +4,14 @@ from qiskit import QuantumCircuit
 from qiskit.utils import *
 import numpy as np
 
-import checker
+import utils
 from qgate import quantum_gate
 import preprocessor as pre
 import crossbar as cb
-import checker as ch
+import utils as ch
 import math
 
 
-# TODO: make 'function restore' to restore the original order of amplitudes
 def quantum_simulation(qubits, qpu, stride_unit, gate_info, amplitudes):
     # 3-qubits, one-qubit-gate, control=1, target=0
     stride_unit.set_attribute(qubits,
@@ -49,8 +48,8 @@ def quantum_simulation(qubits, qpu, stride_unit, gate_info, amplitudes):
         for i, val in enumerate(qpu_result):
             restored_amplitudes.insert(r_index[i], val)
 
-        print('restored', restored_amplitudes)
-        print('\n')
+        # print('restored', restored_amplitudes)
+        # print('\n')
         return np.array(restored_amplitudes)
 
     elif gate_info['gate_type'] == 'two_qubit_gate':
@@ -76,12 +75,11 @@ def quantum_simulation(qubits, qpu, stride_unit, gate_info, amplitudes):
         for i, val in enumerate(np.concatenate((qpu_result, un_reordered))):
             restored_amplitudes.insert(index[i], val)
 
-        # print('index', index)
-        print('restored', restored_amplitudes)
-        print('\n')
+        # print('restored', restored_amplitudes)
+        # print('\n')
         return np.array(restored_amplitudes)
 
-
+# TODO: Fix the cascading problem of complex number from cross-sim
 if __name__ == "__main__":
     # make the crossbar array (=xbar_array)
     qpu = cb.make_core()
@@ -109,12 +107,15 @@ if __name__ == "__main__":
     amplitudes[0][0] = 1 + 0j
 
     # quantum gate information list
-    gate_info_list = checker.clarify_gate_type(qc)
+    gate_info_list = utils.clarify_gate_type(qc)
 
-    # emulate 'do-while'
-    intermediate_result = quantum_simulation(num_qubits, qpu, stride_unit, gate_info_list[0], amplitudes)
-    try:
-        for gate in gate_info_list[1:]:
-            intermediate_result = quantum_simulation(num_qubits, qpu, stride_unit, gate, intermediate_result)
-    except StopIteration:
-        quantum_simulation_result = intermediate_result
+    # # emulate 'do-while'
+    # intermediate_result = quantum_simulation(num_qubits, qpu, stride_unit, gate_info_list[0], amplitudes)
+    # try:
+    #     for gate in gate_info_list[1:]:
+    #         intermediate_result = quantum_simulation(num_qubits, qpu, stride_unit, gate, intermediate_result)
+    # except StopIteration:
+    #     quantum_simulation_result = intermediate_result
+
+    utils.calculate_crossbar_exec_time(gate_info_list, num_qubits, len(gate_info_list))
+    utils.calculate_crossbar_exec_time(gate_info_list)
