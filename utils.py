@@ -1,10 +1,15 @@
 from qiskit import *
 from qiskit.quantum_info import Statevector
 from qiskit.circuit.random import random_circuit
-import cProfile
-from qiskit import Aer
-from bitstring import BitArray
+from qiskit.circuit.library import *
 import numpy as np
+import cProfile
+from bitstring import BitArray
+
+from qiskit.circuit.equivalence_library import SessionEquivalenceLibrary as sel
+from qiskit.transpiler.passes import BasisTranslator
+from qiskit.circuit import QuantumCircuit
+from qiskit.converters import circuit_to_dag, dag_to_circuit
 
 """
 Module for calculate execution time and clarify the quantum gate type
@@ -63,7 +68,34 @@ def find_rs(rs, index):
         return t_rs
 
 
-def eval_etri(gates):
+def find_matrix(inst):
+    # check whether the control gate or not
+    gate_name = ''
+    if inst.num_qubits == 1:
+        gate_name = inst.name.upper()
+    elif inst.num_qubits == 2:
+        gate_name = inst.name[1:].upper()
+    params = inst.params
+
+    gate = None
+    if len(params) == 0:
+        gate = globals()[gate_name + "Gate"]()
+    elif len(params) == 1:
+        gate = globals()[gate_name + "Gate"](*params)
+    elif len(params) == 2:
+        gate = globals()[gate_name + "Gate"](*params)
+    elif len(params) == 3:
+        gate = globals()[gate_name + "Gate"](*params)
+    else:
+        print('Error: No matched param')
+
+    matrix = gate.to_matrix()
+    return matrix
+
+
+
+
+def eval_etri(trans_qc, gates):
     '''
     Option #1
     # # check the intermediate statevector amp
@@ -119,17 +151,22 @@ def eval_etri(gates):
     # index_over_1024 = np.where(rs_length >= 1024, rs_length // 1024, 0)
     '''
 
+    print('length of gates', len(gates))
+
     # initial statevector
     lrs = np.array([[0, 1.0 + 0.0j, False]])
 
     for i in range(0, len(gates)):
         # find the upper and lower array
         stride = 1 << gates[i]['target_qubit']
-        print('stride', stride, '\n')
+        print('stride:', stride, "count:", i)
 
         for j in range(0, np.shape(lrs)[0]):
             upper_index = lrs[j][0].real
             upper_rs = find_rs(lrs, upper_index)
+
+            if upper_rs is None:
+                continue
 
             lower_index = upper_index + stride
             lower_rs = find_rs(lrs, lower_index)
@@ -142,9 +179,51 @@ def eval_etri(gates):
                 next_lrs = np.vstack([next_lrs, upper_rs, lower_rs])
 
         lrs = next_lrs
+        print('previous lrs\n', lrs,)
+        print('-'*40)
 
-        lrs[:, 2] = False
-        print(lrs, '\n')
+        # find the quantum gate matrix
+        qmatrix = find_matrix(trans_qc.data[i].operation)
+        print('qmatrix\n', qmatrix, end='\n')
+        print('-'*40)
+
+        # derive first mvm result
+        vector = lrs[0:2, 1].reshape(2, -1)
+        mvm_result = np.matmul(qmatrix, vector)
+        if mvm_result[0][0] == 0:
+            mvm_rs = np.array([lrs[1][0], mvm_result[1][0], True])
+        elif mvm_result[1][0] == 0:
+            mvm_rs = np.array([lrs[0][0], mvm_result[0][0], True])
+        else:
+            mvm_rs = np.array([[lrs[0][0], mvm_result[0][0], True],
+                               [lrs[1][0], mvm_result[1][0], True]])
+
+        new_rs = mvm_rs
+
+        for k in range(2, len(lrs), 2):
+            vector = lrs[k:k+2, 1].reshape(2, -1)
+            mvm_result = np.matmul(qmatrix, vector)
+            if mvm_result[0][0] == 0:
+                mvm_rs = np.array([lrs[k+1][0], mvm_result[1][0], True])
+            elif mvm_result[1][0] == 0:
+                mvm_rs = np.array([lrs[k][0], mvm_result[0][0], True])
+            else:
+                mvm_rs = np.array([[lrs[k][0], mvm_result[0][0], True],
+                                   [lrs[k+1][0], mvm_result[1][0], True]])
+
+            new_rs = np.vstack([new_rs, mvm_rs])
+
+        lrs = new_rs
+        print('lrs\n', lrs, end='\n')
+
+        if lrs.ndim == 1:
+            lrs[2] = False
+            lrs = np.array([lrs])
+        else:
+            lrs[:, 2] = False
+
+        print("="*40)
+
 
 def eval_qiskit(qc, num_of_cores=5, processor_type="CPU"):
     qc.measure_all()
@@ -197,15 +276,19 @@ def clarify_gate_type(qc):
 
 
 def evaluate():
-    param = 3
+    param = 16
 
-    qc = random_circuit(param, param, 2, measure=False)
+    qc = random_circuit(param, param, 2, measure=False, conditional=False, reset=False)
 
-    gate_infos = clarify_gate_type(qc)
+    trans_qc = transpile(qc, basis_gates=['u1', 'u2', 'u3', 'cx'])
+
+    gate_infos = clarify_gate_type(trans_qc)
+    print('gate_infos', gate_infos, end='\n')
 
     num_of_qubits = qc.num_qubits
 
-    num_of_gates = len(qc.count_ops())
+    num_of_gates = len(trans_qc.count_ops())
+    print('kind of gates', num_of_gates)
 
     # length_of_circuits = len(gate_info)
 
@@ -216,11 +299,12 @@ def evaluate():
     # eval_qiskit(qc, processor_type="CPU", num_of_cores=0)
 
     print(f"\n========ETRI: {param} of qubits and depth quantum circuit==========")
-    eval_etri(gate_infos)
+    eval_etri(trans_qc, gate_infos)
 
 # For testing
 if __name__ == '__main__':
     # cProfile.run('evaluate()', 'report.txt')
+    np.set_printoptions(suppress=True)
     evaluate()
 
 
