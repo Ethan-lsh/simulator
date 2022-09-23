@@ -1,15 +1,9 @@
 from qiskit import *
 from qiskit.quantum_info import Statevector
-from qiskit.circuit.random import random_circuit
-from qiskit.circuit.library import *
+from qiskit.circuit import QuantumRegister, ClassicalRegister, QuantumCircuit
 import numpy as np
 import cProfile
 from bitstring import BitArray
-
-from qiskit.circuit.equivalence_library import SessionEquivalenceLibrary as sel
-from qiskit.transpiler.passes import BasisTranslator
-from qiskit.circuit import QuantumCircuit
-from qiskit.converters import circuit_to_dag, dag_to_circuit
 
 """
 Module for calculate execution time and clarify the quantum gate type
@@ -25,36 +19,6 @@ def cal_stride(target_qubit):
     # calculate the stride value
     stride = 1 << target_qubit
     return stride
-
-
-def calculate_crossbar_exec_time(num_of_qubits, num_of_gates, gate_infos):
-    num_of_qpus = num_of_gates
-
-    count_single_gate = count_control_gate = 0
-    for gate_info in gate_infos:
-        if gate_info['gate_type'] == 'one_qubit_gate':
-            count_single_gate += 1
-        elif gate_info['gate_type'] == 'two_qubit_gate':
-            count_control_gate += 1
-        else:
-            print('No matched gate type')
-
-    T_load = (crossbar_capacity / N_burst) * L_write * num_of_qpus  # write time
-
-    T_extract = T_extract_m = 0  # read time
-    if num_of_qubits <= 10:
-        T_extract = (L_read * count_single_gate) + (L_read * count_control_gate / 2)
-    else:
-        cycle = pow(2, num_of_qubits-10)
-        T_extract = (L_read * count_single_gate * cycle) + (L_read * count_control_gate * cycle / 2)
-
-    T_exec = (T_load + T_extract)
-
-    print(f"Crossbar size: 1024 x 1024\n"
-          f"Load time: {T_load}ns\n"
-          f"Extract time: {T_extract}ns\n"
-          f"Total: {T_exec}ns\n")
-
 
 
 def find_rs(rs, index):
@@ -93,73 +57,43 @@ def find_matrix(inst):
     return matrix
 
 
+def calculate_crossbar_exec_time(num_of_qubits, num_of_gates, gate_infos):
+    num_of_qpus = num_of_gates
+
+    count_single_gate = count_control_gate = 0
+    for gate_info in gate_infos:
+        if gate_info['gate_type'] == 'one_qubit_gate':
+            count_single_gate += 1
+        elif gate_info['gate_type'] == 'two_qubit_gate':
+            count_control_gate += 1
+        else:
+            print('No matched gate type')
+
+    T_load = (crossbar_capacity / N_burst) * L_write * num_of_qpus  # write time
+
+    T_extract = T_extract_m = 0  # read time
+    if num_of_qubits <= 10:
+        T_extract = (L_read * count_single_gate) + (L_read * count_control_gate / 2)
+    else:
+        cycle = pow(2, num_of_qubits-10)
+        T_extract = (L_read * count_single_gate * cycle) + (L_read * count_control_gate * cycle / 2)
+
+    T_exec = (T_load + T_extract)
+
+    print(f"Crossbar size: 1024 x 1024\n"
+          f"Load time: {T_load}ns\n"
+          f"Extract time: {T_extract}ns\n"
+          f"Total: {T_exec}ns\n")
 
 
 def eval_etri(trans_qc, gates):
-    '''
-    Option #1
-    # # check the intermediate statevector amp
-    # qasm_header = 'OPENQASM 2.0; include "qelib1.inc";'
-
-    # str_qasm = rc.qasm()
-    # # print(str_qasm)
-    # str_qasm = str_qasm.split('\n')
-
-    # qasm_header += str_qasm[2] + str_qasm[3]
-
-    # rs_length = list()
-
-    # count_single_gate = count_control_gate = 0
-    # for inst, gate_info in zip(range(4, len(str_qasm)), gate_infos[1:]):
-    #     qasm_header += str_qasm[inst]
-
-    #     dummy_circuit = QuantumCircuit.from_qasm_str(qasm_header)
-
-    #     st = Statevector.from_instruction(dummy_circuit).to_dict()
-    #     # print(st, end='\n')
-    #     # st_keys = list(st.keys())
-
-    #     stride = BitArray(uint=1 << gate_info['target_qubit'], length=n)
-
-    #     rs_list = list()
-    #     for st_key, _ in st.items():
-    #         rs_list.append(st_key)
-
-    #         bin_st_key = BitArray(bin=st_key)
-
-    #         pair_key = bin_st_key | stride
-    #         if pair_key.bin in list(st.keys()):
-    #             continue
-    #         elif pair_key.bin not in list(st.keys()):
-    #             rs_list.append(pair_key.bin)
-
-    #     rs_length.append(len(rs_list))
-    #     # print(len(rs_list))
-    #     if len(rs_list) > pow(2, n):
-    #         print('Error')
-    #         print('\n')
-
-    # qasm_header += str_qasm[-1]
-    # dummy_circuit = QuantumCircuit.from_qasm_str(qasm_header)
-    # st = Statevector.from_instruction(dummy_circuit).to_dict()
-    # # print(st)
-
-    # rs_length = np.array(rs_length)
-    # # print(rs_length)
-
-    # index_under_1024 = np.where(rs_length < 1024)
-    # index_over_1024 = np.where(rs_length >= 1024, rs_length // 1024, 0)
-    '''
-
-    print('length of gates', len(gates))
-
     # initial statevector
     lrs = np.array([[0, 1.0 + 0.0j, False]])
 
     for i in range(0, len(gates)):
         # find the upper and lower array
         stride = 1 << gates[i]['target_qubit']
-        print('stride:', stride, "count:", i)
+        # print('stride:', stride, "count:", i)
 
         for j in range(0, np.shape(lrs)[0]):
             upper_index = lrs[j][0].real
@@ -179,13 +113,13 @@ def eval_etri(trans_qc, gates):
                 next_lrs = np.vstack([next_lrs, upper_rs, lower_rs])
 
         lrs = next_lrs
-        print('previous lrs\n', lrs,)
-        print('-'*40)
+        # print('previous lrs\n', lrs,)
+        # print('-'*40)
 
         # find the quantum gate matrix
         qmatrix = find_matrix(trans_qc.data[i].operation)
-        print('qmatrix\n', qmatrix, end='\n')
-        print('-'*40)
+        # print('qmatrix\n', qmatrix, end='\n')
+        # print('-'*40)
 
         # derive first mvm result
         vector = lrs[0:2, 1].reshape(2, -1)
@@ -214,7 +148,8 @@ def eval_etri(trans_qc, gates):
             new_rs = np.vstack([new_rs, mvm_rs])
 
         lrs = new_rs
-        print('lrs\n', lrs, end='\n')
+        length_of_lrs = len(lrs)
+        # print('lrs\n', lrs, end='\n')
 
         if lrs.ndim == 1:
             lrs[2] = False
@@ -222,7 +157,7 @@ def eval_etri(trans_qc, gates):
         else:
             lrs[:, 2] = False
 
-        print("="*40)
+
 
 
 def eval_qiskit(qc, num_of_cores=5, processor_type="CPU"):
@@ -276,19 +211,19 @@ def clarify_gate_type(qc):
 
 
 def evaluate():
-    param = 16
+    param = 5
 
-    qc = random_circuit(param, param, 2, measure=False, conditional=False, reset=False)
+    qc = QuantumCircuit.from_qasm_file(f'./qasm/rcs_{param}.qasm')
 
-    trans_qc = transpile(qc, basis_gates=['u1', 'u2', 'u3', 'cx'])
+    # trans_qc = transpile(qc, basis_gates=['h', 'x', 'y', 'z', 'cx'])
 
-    gate_infos = clarify_gate_type(trans_qc)
-    print('gate_infos', gate_infos, end='\n')
+    gate_infos = clarify_gate_type(qc)
+    # print('gate_infos', gate_infos, end='\n')
 
     num_of_qubits = qc.num_qubits
 
-    num_of_gates = len(trans_qc.count_ops())
-    print('kind of gates', num_of_gates)
+    num_of_gates = len(qc.count_ops())
+    # print('kind of gates', num_of_gates)
 
     # length_of_circuits = len(gate_info)
 
@@ -299,11 +234,11 @@ def evaluate():
     # eval_qiskit(qc, processor_type="CPU", num_of_cores=0)
 
     print(f"\n========ETRI: {param} of qubits and depth quantum circuit==========")
-    eval_etri(trans_qc, gate_infos)
+    eval_etri(qc, gate_infos)
+
 
 # For testing
 if __name__ == '__main__':
-    # cProfile.run('evaluate()', 'report.txt')
     np.set_printoptions(suppress=True)
     evaluate()
 
