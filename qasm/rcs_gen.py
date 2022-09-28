@@ -41,7 +41,7 @@ def random_circuit(num_qubits, depth, max_operands=3, measure=False,
         raise CircuitError("max_operands must be between 1 and 3")
 
     one_q_ops = [IGate, U1Gate, U2Gate, U3Gate, XGate, YGate, ZGate,
-                 HGate, SGate, SDGGate, TGate, TDGGate, RXGate, RYGate, RZGate]
+                 HGate, SGate, SDGGate, TGate, RXGate, RYGate, RZGate]
     one_param = [U1Gate, RXGate, RYGate, RZGate, CU1Gate, CRZGate]
     two_param = [U2Gate]
     three_param = [U3Gate, CU3Gate]
@@ -108,10 +108,10 @@ def random_circuit(num_qubits, depth, max_operands=3, measure=False,
     if measure:
         qc.measure(qr, cr)
 
-    qc.qasm(formatted=False, filename=f'rcs_{num_qubits}.qasm')
+    qc.qasm(formatted=False, filename=f'./rcs/rcs_{num_qubits}.qasm')
     return qc
 
 
 if __name__ == '__main__':
-    qubits = 20
+    qubits = 26
     random_circuit(qubits, qubits, 2, measure=False, conditional=False)
