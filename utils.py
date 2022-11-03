@@ -113,9 +113,7 @@ def do_mvm(lrs, qmatrix):
     return new_lrs
 
 
-def calculate_crossbar_exec_time(num_of_qubits, num_of_gates, gate_infos):
-    num_of_qpus = num_of_gates
-
+def calculate_crossbar_exec_time(num_of_qubits, kind_of_gates, gate_infos):
     count_single_gate = count_control_gate = 0
     for gate_info in gate_infos:
         if gate_info['gate_type'] == 'one_qubit_gate':
@@ -125,7 +123,8 @@ def calculate_crossbar_exec_time(num_of_qubits, num_of_gates, gate_infos):
         else:
             print('No matched gate type')
 
-    T_load = (crossbar_capacity / N_burst) * L_write * num_of_qpus  # write time
+    # T_load = (crossbar_capacity / N_burst) * L_write * num_of_qpus  # write time
+    T_load = 1024 * 512 * L_write * kind_of_gates
 
     T_extract = T_extract_m = 0  # read time
     if num_of_qubits <= 10:
@@ -194,7 +193,8 @@ def eval_etri(qc, gates, kind_of_gates):
 
         T_extract += T_extract_m
 
-    T_load = (crossbar_capacity / N_burst) * L_write * kind_of_gates  # write time
+    # T_load = (crossbar_capacity / N_burst) * L_write * kind_of_gates  # write time
+    T_load = 1024 * 512 * L_write * kind_of_gates
 
     T_exec = T_load + T_extract
 
