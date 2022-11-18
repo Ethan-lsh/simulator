@@ -29,7 +29,7 @@ h q[2];
 
 // This measures the first 3 qubits.
 measure q[0] -> c[0];
-measure q[1] -> c[1]; 
+measure q[1] -> c[1];
 measure q[2] -> c[2];
 
 // This measures the second 3 qubits.
