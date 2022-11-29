@@ -4,7 +4,8 @@ from qiskit.circuit import QuantumRegister, ClassicalRegister, QuantumCircuit
 from qiskit.circuit import Reset
 from qiskit.circuit.library.standard_gates import (IGate, U1Gate, XGate, YGate, ZGate, HGate, SGate, SdgGate as SDGGate, TGate,
                                                    TdgGate as TDGGate, RXGate, RZGate, CXGate,
-                                                   CZGate, SwapGate as SWAPGate)
+                                                   CZGate, SwapGate as SWAPGate,
+                                                   CCXGate)
 from qiskit.circuit.exceptions import CircuitError
 from qiskit.util import deprecate_arguments
 

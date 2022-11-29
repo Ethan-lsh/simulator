@@ -10,8 +10,11 @@ from bitstring import BitArray
 Module for calculate execution time and clarify the quantum gate type
 """
 
-L_read = 5.2775  # Read latency (nanosecond)
-L_write = 7.76179  # Write latency (nanosecond)
+L_read = 2.8717
+L_write = 5.23066
+
+OL_read = 3.9984  # Read latency (nanosecond)
+OL_write = 6.4441  # Write latency (nanosecond)
 crossbar_capacity = 1024 * 1024  # rows x columns
 N_burst = 512  # 64bytes burst write
 
@@ -47,6 +50,7 @@ def find_matrix(inst):
             gate_name = 'I'
     elif inst.name.find('c') == 0:
         gate_name = inst.name[1:].upper()
+        if gate_name == 'CX': gate_name = 'X'
 
     params = inst.params
 
@@ -145,7 +149,9 @@ def eval_etri(qc, gates, kind_of_gates):
     # initial statevector
     lrs = np.array([[0, 1.0 + 0.0j, False]])
 
-    T_extract = T_extract_m = 0  # read time
+    T_extract = T_extract_m = 0    # No optimized read time
+    OT_extract = OT_extract_m = 0  # Optimization read time
+    TT_reorder = 0 # total reordering time
 
     
     for i in range(0, len(gates)):
@@ -153,7 +159,13 @@ def eval_etri(qc, gates, kind_of_gates):
         stride = 1 << gates[i]['target_qubit']
         # print('stride:', stride, "count:", i)
 
-        for j in range(0, np.shape(lrs)[0]):
+        length_of_rs = np.shape(lrs)[0]
+
+        T_reorder = L_read * length_of_rs
+        TT_reorder += T_reorder
+
+        for j in range(0, length_of_rs):
+            
             upper_index = lower_index = 0
 
             upper_index = lrs[j][0].real
@@ -186,22 +198,36 @@ def eval_etri(qc, gates, kind_of_gates):
         length_of_lrs = len(lrs)
         # print('length of lrs: ', length_of_lrs)
 
-        if length_of_lrs <= 1024:
-            T_extract_m = L_read
-        elif length_of_lrs > 1024:
-            T_extract_m = L_read * (length_of_lrs / pow(2, 10))
+        slice_of_lrs = length_of_lrs / 2
+        # print('slice of lrs', slice_of_lrs)
 
+        T_extract_m = (L_read * slice_of_lrs * 2)
         T_extract += T_extract_m
 
-    # T_load = (crossbar_capacity / N_burst) * L_write * kind_of_gates  # write time
-    T_load = 1024 * L_write * (1024 / N_burst)
+        if length_of_lrs <= 512:
+            OT_extract_m = OL_read * 2
+        elif length_of_lrs > 512:
+            OT_extract_m = OL_read * (length_of_lrs / pow(2, 9)) * 2
 
-    T_exec = T_load + T_extract
+        OT_extract += OT_extract_m
 
+
+    T_load = (2 * 2) * L_write
+    T_exec = T_load + T_extract    
+
+    OT_load = 1024 * OL_write * (1024 / N_burst)
+    OT_exec = OT_load + OT_extract
+
+    print('Total reordering time', TT_reorder)
     print(f"#### ETRI method on Crossbar (ns) ####\n"
+          f"\n#### No optimized ####\n"
           f"Load time: {T_load}\n"
-          f"Extract time: {T_extract}\n"
-          f"Total: {T_exec}\n")
+          f"Extraction time: {T_extract}\n"
+          f"Total: {T_exec}\n"
+          f"\n#### Optimized ####\n"
+          f"Load time: {OT_load}\n"
+          f"Extract time: {OT_extract}\n"
+          f"Total: {OT_exec}\n")
     
 
     '''
@@ -257,7 +283,7 @@ def clarify_gate_type(qc):
 
         # qc.data.qubits
         gate_type = None
-        control_qubit = target_qubit = 0
+        ccontrol_qubit = control_qubit = target_qubit = 0
 
         if len(inst.qubits) == 1:
             gate_type = 'one_qubit_gate'
@@ -269,16 +295,23 @@ def clarify_gate_type(qc):
             control_qubit = inst.qubits[0]._index
             target_qubit = inst.qubits[1]._index
 
-        gate_info_list.append({"quantum_gate": quantum_gate, "gate_type": gate_type, "control_qubit": control_qubit,
+        elif len(inst.qubits) == 3:
+            gate_type = 'three_qubit_gate'
+            ccontrol_qubit = inst.qubits[0]._index
+            control_qubit = inst.qubits[1]._index
+            target_qubit = inst.qubits[2]._index
+
+        gate_info_list.append({"quantum_gate": quantum_gate, "gate_type": gate_type, "ccontrol_qubit": ccontrol_qubit,
+                                "control_qubit": control_qubit,
                                "target_qubit": target_qubit})
 
     return gate_info_list
 
 
 def evaluate():
-    # param = int(sys.argv[1])
+    param = sys.argv[1]
 
-    qc = QuantumCircuit.from_qasm_file(f'../qasm/TEST_QASMBench/large/ghz_state_n23.qasm')
+    qc = QuantumCircuit.from_qasm_file(f'../qasm/TEST_QASMBench/{param}')
 
 
     gate_infos = clarify_gate_type(qc)
@@ -291,7 +324,7 @@ def evaluate():
 
     # length_of_circuits = len(gate_info)
 
-    print(f"============== Crossbar Array : 1024 x 1024 =============")
+    print(f"============== Crossbar Array : 512 x 512 =============")
     # print(f"-------------- {param} qubits ----------------")
     
     # calculate_crossbar_exec_time(num_of_qubits, kind_of_gates, gate_infos)

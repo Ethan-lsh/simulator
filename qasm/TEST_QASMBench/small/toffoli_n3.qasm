@@ -22,6 +22,3 @@ tdg a[1];
 cx a[0],a[1];
 t a[0];
 s a[1];
-measure a[0] -> c[0];
-measure a[1] -> c[1];
-measure a[2] -> c[2];
