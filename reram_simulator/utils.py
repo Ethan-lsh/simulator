@@ -153,6 +153,9 @@ def eval_etri(qc, gates, kind_of_gates):
     OT_extract = OT_extract_m = 0  # Optimization read time
     TT_reorder = 0 # total reordering time
 
+    mem_for_read = 0
+    Mem_for_read = 0 # total memory for read
+
     
     for i in range(0, len(gates)):
         # find the upper and lower array
@@ -163,6 +166,7 @@ def eval_etri(qc, gates, kind_of_gates):
 
         T_reorder = L_read * length_of_rs
         TT_reorder += T_reorder
+        Mem_for_read += mem_for_read
 
         for j in range(0, length_of_rs):
             
@@ -199,6 +203,7 @@ def eval_etri(qc, gates, kind_of_gates):
         # print('length of lrs: ', length_of_lrs)
 
         slice_of_lrs = length_of_lrs / 2
+        mem_for_read = length_of_lrs * 16
         # print('slice of lrs', slice_of_lrs)
 
         T_extract_m = (L_read * slice_of_lrs * 2)
@@ -219,7 +224,8 @@ def eval_etri(qc, gates, kind_of_gates):
     OT_exec = OT_load + OT_extract
 
     print('Total reordering time', TT_reorder)
-    print(f"#### ETRI method on Crossbar (ns) ####\n"
+    print(f"Total read memory consumption: {Mem_for_read} bit\n"
+          f"#### ETRI method on Crossbar (ns) ####\n"
           f"\n#### No optimized ####\n"
           f"Load time: {T_load}\n"
           f"Extraction time: {T_extract}\n"
