@@ -2,15 +2,14 @@ import numpy as np
 
 from qiskit.circuit import QuantumRegister, ClassicalRegister, QuantumCircuit
 from qiskit.circuit import Reset
-from qiskit.circuit.library.standard_gates import (IGate, U1Gate, U2Gate, U3Gate, XGate,
-                                                   YGate, ZGate, HGate, SGate, SdgGate as SDGGate, TGate,
-                                                   TdgGate as TDGGate, RXGate, RYGate, RZGate, CXGate,
-                                                   CYGate, CZGate, CHGate, CRZGate, CU1Gate,
-                                                   CU3Gate, SwapGate as SWAPGate, RZZGate,
-                                                   CCXGate, CSwapGate as CSWAPGate)
+from qiskit.circuit.library.standard_gates import (IGate, U1Gate, XGate, YGate, ZGate, HGate, SGate, SdgGate as SDGGate, TGate,
+                                                   TdgGate as TDGGate, RXGate, RZGate, CXGate,
+                                                   CZGate, SwapGate as SWAPGate,
+                                                   CCXGate)
 from qiskit.circuit.exceptions import CircuitError
 from qiskit.util import deprecate_arguments
 
+import sys
 
 @deprecate_arguments({'n_qubits': 'num_qubits'})
 def random_circuit(num_qubits, depth, max_operands=3, measure=False,
@@ -40,13 +39,10 @@ def random_circuit(num_qubits, depth, max_operands=3, measure=False,
     if max_operands < 1 or max_operands > 3:
         raise CircuitError("max_operands must be between 1 and 3")
 
-    one_q_ops = [IGate, U1Gate, U2Gate, U3Gate, XGate, YGate, ZGate,
-                 HGate, SGate, SDGGate, TGate, RXGate, RYGate, RZGate]
-    one_param = [U1Gate, RXGate, RYGate, RZGate, CU1Gate, CRZGate]
-    two_param = [U2Gate]
-    three_param = [U3Gate, CU3Gate]
-    two_q_ops = [CXGate, CYGate, CZGate, CHGate, CRZGate,
-                 CU1Gate, CU3Gate, SWAPGate]
+    one_q_ops = [IGate, U1Gate, XGate, YGate, ZGate,
+                 HGate, SGate, SDGGate, TGate, TDGGate, RXGate, RZGate]
+    one_param = [U1Gate, RXGate, RZGate]
+    two_q_ops = [CXGate, CZGate, SWAPGate]
 
     qr = QuantumRegister(num_qubits, 'q')
     qc = QuantumCircuit(num_qubits)
@@ -78,10 +74,6 @@ def random_circuit(num_qubits, depth, max_operands=3, measure=False,
                 operation = rng.choice(two_q_ops)
             if operation in one_param:
                 num_angles = 1
-            elif operation in two_param:
-                num_angles = 2
-            elif operation in three_param:
-                num_angles = 3
             else:
                 num_angles = 0
             angles = [rng.uniform(0, 2 * np.pi) for x in range(num_angles)]
@@ -113,5 +105,5 @@ def random_circuit(num_qubits, depth, max_operands=3, measure=False,
 
 
 if __name__ == '__main__':
-    qubits = 26
+    qubits = int(sys.argv[1])
     random_circuit(qubits, qubits, 2, measure=False, conditional=False)
