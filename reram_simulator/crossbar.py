@@ -25,12 +25,16 @@ def make_core():
     params.algorithm_params.row_update.maximum = 3
     params.algorithm_params.row_update.minimum = -3
 
-    # Gaussian error function with sigma = 0.1
-    params.xbar_params.row_input.bits = 2
-    params.xbar_params.row_input.sign_bit = False
+    # D/A property
+    params.xbar_params.row_input.bits = 7
+    params.xbar_params.row_input.sign_bit = True
     params.xbar_params.row_input.normal_error_post.sigma = error_rate
     params.xbar_params.row_input.uniform_error_post.keep_within_range = True
 
+    # A/D property
+    params.xbar_params.col_output.bits = 7
+    params.xbar_params.col_output.sign_bit = True
+   
     # Read/write noise
     params.numeric_params.read_noise.sigma = error_rate
     params.numeric_params.read_noise.proportional = False

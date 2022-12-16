@@ -27,7 +27,7 @@ def cal_stride(target_qubit):
 
 def find_rs(rs, index):
     try:
-        value = np.where(rs[:, 0] == index)[0].real[0]
+        value = np.where(rs[:, 0] == index)[0].real[0] 
         if (value >= 0) and (rs[value, 2] == False):
             rs[value, 2] = True
             return rs[value]
@@ -168,6 +168,7 @@ def eval_etri(qc, gates, kind_of_gates):
         TT_reorder += T_reorder
         Mem_for_read += mem_for_read
 
+        # reordering code block
         for j in range(0, length_of_rs):
             
             upper_index = lower_index = 0
@@ -236,27 +237,6 @@ def eval_etri(qc, gates, kind_of_gates):
           f"Total: {OT_exec}\n")
     
 
-    '''
-    ratio = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
-
-    T_write = (crossbar_capacity / N_burst) * L_write * kind_of_gates  # write time
-    print(f'Load time: {T_write}\n')
-
-    T_read = 0
-    for i in range(0, len(ratio)):
-        RS_length = pow(2, qc.num_qubits) * ratio[i]
-
-        if RS_length <= 1024:
-            T_read= L_read * 2 * len(gates)
-        else:
-            T_read = L_read * 2 * (RS_length / 1024) * len(gates)
-
-        T_total = T_write + T_read
-
-        print(f"Extract time: {T_read}\n"
-            f"Total: {T_total}\n")
-    '''
-
 def eval_qiskit(qc, num_of_cores, processor_type="CPU"):
     qc.measure_all()
 
@@ -285,7 +265,7 @@ def clarify_gate_type(qc):
 
     # inst = qc.data
     for inst in qc.data:
-        quantum_gate = inst.operation._name
+        gate_name = inst.operation._name
 
         # qc.data.qubits
         gate_type = None
@@ -307,9 +287,11 @@ def clarify_gate_type(qc):
             control_qubit = inst.qubits[1]._index
             target_qubit = inst.qubits[2]._index
 
-        gate_info_list.append({"quantum_gate": quantum_gate, "gate_type": gate_type, "ccontrol_qubit": ccontrol_qubit,
+        gate_info_list.append({"gate_name": gate_name, 
+                                "gate_type": gate_type, 
+                                "ccontrol_qubit": ccontrol_qubit,
                                 "control_qubit": control_qubit,
-                               "target_qubit": target_qubit})
+                                "target_qubit": target_qubit})
 
     return gate_info_list
 
@@ -339,10 +321,3 @@ def evaluate():
     
     eval_qiskit(qc, processor_type="CPU", num_of_cores=24)
 
-   
-
-
-# For testing
-if __name__ == '__main__':
-    np.set_printoptions(suppress=True)
-    evaluate()
