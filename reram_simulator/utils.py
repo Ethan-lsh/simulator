@@ -51,12 +51,16 @@ def reorder(stride, realized_rsv):
         lower_index = upper_index + stride
         lower_rsv = find_rs(realized_rsv, lower_index)
 
+        # print('upper_rsv', upper_rsv)
+        # print('lower_index', lower_index)
+        # print('lower_rsv', lower_rsv)
+
         # combine and store in reorderd rsv
         if i == 0:
-            pair_rsv = np.vstack([upper_rsv, lower_rsv])
+            pair_rsv = np.vstack([[upper_rsv, lower_rsv]])
             reordered_rsv = pair_rsv
         elif i > 0:
-            pair_rsv = np.vstack([reordered_rsv, upper_rsv, lower_rsv])
+            pair_rsv = np.vstack([[reordered_rsv, upper_rsv, lower_rsv]])
 
     return reordered_rsv
 

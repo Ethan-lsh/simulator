@@ -12,18 +12,18 @@ def make_core():
     params.algorithm_params.disable_clipping = False
     params.algorithm_params.weights.maximum = 10
     params.algorithm_params.weights.minimum = -10
-    params.algorithm_params.col_input.maximum = 3.0
-    params.algorithm_params.col_input.minimum = -3.0
-    params.algorithm_params.row_input.maximum = 3.0
-    params.algorithm_params.row_input.minimum = -3.0
-    params.algorithm_params.col_output.maximum = 3
-    params.algorithm_params.col_output.minimum = -3
-    params.algorithm_params.row_output.maximum = 3
-    params.algorithm_params.row_output.minimum = -3
-    params.algorithm_params.col_update.maximum = 3
-    params.algorithm_params.col_update.minimum = -3
-    params.algorithm_params.row_update.maximum = 3
-    params.algorithm_params.row_update.minimum = -3
+    params.algorithm_params.col_input.maximum = 1.0
+    params.algorithm_params.col_input.minimum = -1.0
+    params.algorithm_params.row_input.maximum = 1.0
+    params.algorithm_params.row_input.minimum = -1.0
+    params.algorithm_params.col_output.maximum = 1
+    params.algorithm_params.col_output.minimum = -1
+    params.algorithm_params.row_output.maximum = 1
+    params.algorithm_params.row_output.minimum = -1
+    params.algorithm_params.col_update.maximum = 1
+    params.algorithm_params.col_update.minimum = -1
+    params.algorithm_params.row_update.maximum = 1
+    params.algorithm_params.row_update.minimum = -1
 
     # D/A property
     params.xbar_params.row_input.bits = 7

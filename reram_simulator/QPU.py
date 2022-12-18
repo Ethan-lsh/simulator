@@ -30,7 +30,7 @@ class QPU:
     # set the xbar weight
     def set_weight(self, instruction):
         # the number of matrix stored in the xbar
-        number_of_matrix = 1024 / 2
+        number_of_matrix = 1024 / 1024
 
         matrix = utils.find_matrix(instruction)
         # print('rm', matrix.real)
@@ -38,6 +38,7 @@ class QPU:
 
         # make the diagonal matrix both real and imaginary
         real_weight = block_diag(*(matrix.real * number_of_matrix))
+        print('real weight', real_weight)
         imag_weight = block_diag(*(matrix.imag * number_of_matrix))
 
         self.real_xbar.set_matrix(real_weight)
@@ -60,13 +61,22 @@ class QPU:
 
     # qubit gate operation depends on the gate type
     def quantum_gate_process(self, rsv):
+        # calculate the stride value and initialize the offset value
+        if self.target_qubit <= self.num_qubits:
+            self.stride = 1 << self.target_qubit
+        else:
+            print("The target index is larger than the qubits range")
+        
         # do the mvm operation according to the gate type
         if self.gate_type == 'one_qubit_gate':
             # reorder all rsv without changing the index
             reordered_rsv = utils.reorder(self.stride, rsv)
-            print('one qubit: reordered_rsv', reordered_rsv)
+            print('one qubit: reordered_rsv\n', reordered_rsv)
 
-            # return after reshape for making a pair of rsv, (2,1) vector
+            # FIXME: fix the dimention error
+            result = self.real_xbar.run_xbar_vmm(reordered_rsv)
+            print(result)
+
             return reordered_rsv
 
         elif self.gate_type == 'two_qubit_gate':
