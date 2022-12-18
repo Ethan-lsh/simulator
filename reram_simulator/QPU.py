@@ -1,74 +1,54 @@
 import numpy as np
+from scipy.linalg import block_diag
 from bitstring import Bits, BitArray
 import crossbar
 from qiskit.circuit.library import *
+import utils
 
 
 class QPU:
     def __init__(self):
-        self.rsv = None
         self.num_qubits = 0
-        self.target_qubit = 0
-        self.control_qubit = 0
-        self.stride = 0
+        self.gate_name = ''
         self.gate_type = None
-        self.xbar = crossbar.make_core()
+        self.ccontrol_qubit = 0
+        self.control_qubit = 0
+        self.target_qubit = 0
+        self.stride = 0
+        self.real_xbar = crossbar.make_core()  # real part of matrix
+        self.imag_xbar = crossbar.make_core()  # imaginary part of matrix
 
     # set the input parameter
-    def set_attribute(self, num_qubits, gate_type, control_qubit, target_qubit):
+    def set_attribute(self, num_qubits, gate_name, gate_type, ccontrol_qubit, control_qubit, target_qubit):
         self.num_qubits = num_qubits
+        self.gate_name = gate_name
         self.gate_type = gate_type
+        self.ccontrol_qubit = ccontrol_qubit
         self.control_qubit = control_qubit
         self.target_qubit = target_qubit
 
-    # set the rsv
-    def set_rsv(self, rsv):
-        self.rsv = rsv
-
-    # get the rsv
-    def get_rsv(self):
-        print('rsv\n', self.rsv)
-        return self.rsv
-
     # set the xbar weight
     def set_weight(self, instruction):
-        # check whether the control gate or not
-        gate_name = ''
+        # the number of matrix stored in the xbar
+        number_of_matrix = 1024 / 2
 
-        if instruction.name.find('c') == -1:
-            gate_name = instruction.name.upper()
-            if gate_name == 'SDG':
-                gate_name = 'Sdg'
-            elif gate_name == 'TDG':
-                gate_name = 'Tdg'
-            elif gate_name == 'ID':
-                gate_name = 'I'
-        elif instruction.name.find('c') == 0:
-            gate_name = instruction.name[1:].upper()
-            if gate_name == 'CX': gate_name = 'X'
+        matrix = utils.find_matrix(instruction)
+        # print('rm', matrix.real)
+        # print('im', matrix.imag)
 
-        params = instruction.params
+        # make the diagonal matrix both real and imaginary
+        real_weight = block_diag(*(matrix.real * number_of_matrix))
+        imag_weight = block_diag(*(matrix.imag * number_of_matrix))
 
-        gate = None
-        if len(params) == 0:
-            gate = globals()[gate_name + "Gate"]()
-        elif len(params) == 1:
-            gate = globals()[gate_name + "Gate"](*params)
-        elif len(params) == 2:
-            gate = globals()[gate_name + "Gate"](*params)
-        elif len(params) == 3:
-            gate = globals()[gate_name + "Gate"](*params)
-        else:
-            print('Error: No matched param')
-
-        matrix = gate.to_matrix()
-        self.xbar.set_matrix(matrix)
+        self.real_xbar.set_matrix(real_weight)
+        self.imag_xbar.set_matrix(imag_weight)
 
 
     # get the xbar weight
+    # FIXME: change read matrix attribute
     def get_weight(self):
-        print('weight\n', self.xbar._read_matrix)
-        return self.xbar._read_matrix
+        print('weight\n', self.real_xbar._read_matrix)
+        print('weight\n', self.imag_xbar._read_matrix)
 
     # calculate the stride value and initialize the offset value
     def cal_stride(self):
@@ -77,15 +57,17 @@ class QPU:
         else:
             print("The target index is larger than the qubits range")
 
+
     # qubit gate operation depends on the gate type
-    def quantum_gate_process(self):
+    def quantum_gate_process(self, rsv):
         # do the mvm operation according to the gate type
         if self.gate_type == 'one_qubit_gate':
             # reorder all rsv without changing the index
-            reordered_rsv = reorder(self.stride, self.gate_type, self.rsv)
+            reordered_rsv = utils.reorder(self.stride, rsv)
+            print('one qubit: reordered_rsv', reordered_rsv)
 
             # return after reshape for making a pair of rsv, (2,1) vector
-            return reordered_rsv.reshape((-1, 2)), reordered_index, None
+            return reordered_rsv
 
         elif self.gate_type == 'two_qubit_gate':
             # initialize the empty list to store the realized states
@@ -103,7 +85,10 @@ class QPU:
             unrealized_index = []
 
             # find the realized rsv
-            for offset in range(0, 2 ** self.num_qubits):
+            for k in range(0, np.shape(rsv)[0]):
+                # extract the offset(=index)
+                offset = rsv[k][0]
+
                 # convert the decimal offset into the binary representation
                 bin_offset = BitArray(uint=offset, length=self.num_qubits)
 
@@ -117,63 +102,26 @@ class QPU:
                     realized_index.append(offset)
 
                     # add the realized rsv
-                    realized_rsv.append(flatten_rsv[offset])
+                    realized_rsv.append(rsv[offset])
 
                 elif enable.uint == 0:
                     # add the unrealized index
                     unrealized_index.append(offset)
 
                     # add the unrealized rsv
-                    unrealized_rsv.append(flatten_rsv[offset])
+                    unrealized_rsv.append(rsv[offset])
 
                 else:
                     print("Cannot check the realized states")
 
-            print('realized', realized_rsv)
+            # print('realized', realized_rsv)
             # reorder the realized rsv
-            reordered_rsv, reordered_index = reorder(self.stride, self.gate_type,
-                                                            np.array(realized_rsv), realized_index)
+            reordered_rsv = utils.reorder(self.stride, realized_rsv)
+            print('two qubit: reordered', reordered_rsv)
 
             # return after reshape for making a pair of rsv, (2,1) vector
-            return reordered_rsv.reshape((-1, 2)), reordered_index, unrealized_rsv, unrealized_index
+            return reordered_rsv, unrealized_rsv
 
         else:
             print("No matched gate type!")
 
-
-        def find_rs(rs, index):
-            try:
-                value = np.where(rs[:, 0] == index)[0].real[0]
-                if (value >= 0) and (rs[value, 2] == False):
-                    rs[value, 2] = True
-                    return rs[value]
-            except IndexError:
-                t_rs = np.array([index, 0.0 + 0.0j, True])
-                return t_rs
-
-        
-        # reorder the rsv of each qubit state according to the stride value
-        @staticmethod
-        def reorder(stride, gate_type, rsv):
-            length_of_rsv = np.shape(rsv)[0]
-            
-            for i in range(0, length_of_rsv):
-                upper_index = lower_index = 0
-
-                upper_index = rsv[i][0].real
-                upper_rsv = find_rs(rsv, upper_index)
-
-                if upper_rsv is None or []:
-                    continue
-
-                lower_index = upper_index + stride
-                lower_rsv = find_rs(rsv, lower_index)
-
-                # combine and store in reorderd rsv
-                if i == 0:
-                    pair_rsv = np.vstack([upper_rsv, lower_rsv])
-                    reordered_rsv = pair_rsv
-                elif i > 0:
-                    pair_rsv = np.vstack([reordered_rsv, upper_rsv, lower_rsv])
-
-            return reordered_rsv

@@ -27,13 +27,38 @@ def cal_stride(target_qubit):
 
 def find_rs(rs, index):
     try:
-        value = np.where(rs[:, 0] == index)[0].real[0] 
+        value = np.where(rs[:, 0] == index)[0].real[0]
         if (value >= 0) and (rs[value, 2] == False):
             rs[value, 2] = True
             return rs[value]
     except IndexError:
         t_rs = np.array([index, 0.0 + 0.0j, True])
         return t_rs
+
+# reorder the rsv of each qubit state according to the stride value
+def reorder(stride, realized_rsv):
+    length_of_rsv = np.shape(realized_rsv)[0]
+    
+    for i in range(0, length_of_rsv):
+        upper_index = lower_index = 0
+
+        upper_index = realized_rsv[i][0].real
+        upper_rsv = find_rs(realized_rsv, upper_index)
+
+        if upper_rsv is None or []:
+            continue
+
+        lower_index = upper_index + stride
+        lower_rsv = find_rs(realized_rsv, lower_index)
+
+        # combine and store in reorderd rsv
+        if i == 0:
+            pair_rsv = np.vstack([upper_rsv, lower_rsv])
+            reordered_rsv = pair_rsv
+        elif i > 0:
+            pair_rsv = np.vstack([reordered_rsv, upper_rsv, lower_rsv])
+
+    return reordered_rsv
 
 
 def find_matrix(inst):
@@ -115,34 +140,6 @@ def do_mvm(lrs, qmatrix):
     # print(new_lrs)
 
     return new_lrs
-
-
-def calculate_crossbar_exec_time(num_of_qubits, kind_of_gates, gate_infos):
-    count_single_gate = count_control_gate = 0
-    for gate_info in gate_infos:
-        if gate_info['gate_type'] == 'one_qubit_gate':
-            count_single_gate += 1
-        elif gate_info['gate_type'] == 'two_qubit_gate':
-            count_control_gate += 1
-        else:
-            print('No matched gate type')
-
-    # T_load = (crossbar_capacity / N_burst) * L_write * num_of_qpus  # write time
-    T_load = 1024 * L_write * (1024 / N_burst)
-
-    T_extract = T_extract_m = 0  # read time
-    if num_of_qubits <= 10:
-        T_extract = (L_read * count_single_gate) + (L_read * count_control_gate / 2)
-    else:
-        cycle = pow(2, num_of_qubits - 10)
-        T_extract = (L_read * count_single_gate * cycle) + (L_read * count_control_gate * cycle / 2)
-
-    T_exec = (T_load + T_extract)
-
-    print(f"#### QCL method on Crossbar (ns) ####\n"
-          f"Load time: {T_load}\n"
-          f"Extract time: {T_extract}\n"
-          f"Total: {T_exec}\n")
 
 
 def eval_etri(qc, gates, kind_of_gates):
