@@ -41,12 +41,13 @@ if __name__ == "__main__":
     rsv = np.array([[0, 1.0+0.0j, False]])
 
     qpu = QPU()
-    
+
+    # FIXME: Modify the process that set_attribute for automatically
     # unpacking the quantum gate list
-    qpu.set_attribute(n_qubits, **gate_info_list[0])
+    qpu.set_attribute(n_qubits, **gate_info_list[1])
 
     # set the quanutm gate matrix called weight
-    qpu.set_weight(qc.data[0].operation)
+    qpu.set_weight(qc.data[1].operation)
 
     print(qpu.gate_type)
 

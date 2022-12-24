@@ -30,16 +30,16 @@ class QPU:
     # set the xbar weight
     def set_weight(self, instruction):
         # the number of matrix stored in the xbar
-        number_of_matrix = 1024 / 1024
+        number_of_matrix = int(1024 / 1024)
 
         matrix = utils.find_matrix(instruction)
         # print('rm', matrix.real)
         # print('im', matrix.imag)
 
         # make the diagonal matrix both real and imaginary
-        real_weight = block_diag(*(matrix.real * number_of_matrix))
+        real_weight = block_diag(*([matrix.real] * number_of_matrix))
         print('real weight', real_weight)
-        imag_weight = block_diag(*(matrix.imag * number_of_matrix))
+        imag_weight = block_diag(*([matrix.imag] * number_of_matrix))
 
         self.real_xbar.set_matrix(real_weight)
         self.imag_xbar.set_matrix(imag_weight)
@@ -58,7 +58,6 @@ class QPU:
         else:
             print("The target index is larger than the qubits range")
 
-
     # qubit gate operation depends on the gate type
     def quantum_gate_process(self, rsv):
         # calculate the stride value and initialize the offset value
@@ -66,18 +65,40 @@ class QPU:
             self.stride = 1 << self.target_qubit
         else:
             print("The target index is larger than the qubits range")
-        
+
+        real_reordered_rsv = img_reordered_rsv = []
+
         # do the mvm operation according to the gate type
         if self.gate_type == 'one_qubit_gate':
             # reorder all rsv without changing the index
             reordered_rsv = utils.reorder(self.stride, rsv)
             print('one qubit: reordered_rsv\n', reordered_rsv)
 
-            # FIXME: fix the dimention error
-            result = self.real_xbar.run_xbar_vmm(reordered_rsv)
-            print(result)
+            # divide the reordered rsv into real and imaginary vector
+            real_reordered_rsv = reordered_rsv.real
+            img_reordered_rsv = reordered_rsv.imag
 
-            return reordered_rsv
+            # For real part
+            # do the vector-matrix-multiplication
+            real_vmm_result = self.real_xbar.run_xbar_vmm(real_reordered_rsv[:, 1])
+            img_vmm_result = self.real_xbar.run_xbar_vmm(img_reordered_rsv[:, 1])
+            print('real, img result', real_vmm_result, img_vmm_result)
+
+            # For imaginary part
+            # do the vector-matrix multiplication
+            real_vmm_result += self.real_xbar.run_xbar_vmm(img_reordered_rsv[:, 1])
+            img_vmm_result += self.real_xbar.run_xbar_vmm(real_reordered_rsv[:, 1])
+
+            # recover the amplitude
+            # update the amplitude in the original rsv
+            real_reordered_rsv[:, 1] = real_vmm_result
+            img_reordered_rsv[:, 1] = img_vmm_result
+
+            # combine real and img
+            reordered_rsv.real = real_reordered_rsv
+            reordered_rsv.imag = img_reordered_rsv
+
+            print('after update', reordered_rsv)
 
         elif self.gate_type == 'two_qubit_gate':
             # initialize the empty list to store the realized states
@@ -97,29 +118,39 @@ class QPU:
             # find the realized rsv
             for k in range(0, np.shape(rsv)[0]):
                 # extract the offset(=index)
-                offset = rsv[k][0]
+                offset = int(rsv[k][0])
 
                 # convert the decimal offset into the binary representation
                 bin_offset = BitArray(uint=offset, length=self.num_qubits)
 
                 # check the offset has the control index as 1
                 # ex) |010> & |000> = 0, |010> & |001> = 0, |010> & |010> > 0, ...
-                enable = bin_control_qubit & bin_offset
+                # enable = bin_control_qubit & bin_offset
+
+                enable = 1 if rsv[offset][1] > 0 else 0
 
                 # when enable == 1, it means the qubit of control index on offset is '1' named 'realized'
-                if enable.uint > 0:
+                if enable > 0:
                     # add the realized index
                     realized_index.append(offset)
 
                     # add the realized rsv
                     realized_rsv.append(rsv[offset])
 
-                elif enable.uint == 0:
+                    # make ndarray
+                    realized_index = np.array(realized_index)
+                    realized_rsv = np.array(realized_rsv)
+
+                elif enable == 0:
                     # add the unrealized index
                     unrealized_index.append(offset)
 
                     # add the unrealized rsv
                     unrealized_rsv.append(rsv[offset])
+
+                    # make ndarray
+                    unrealized_index = np.array(unrealized_index)
+                    unrealized_rsv = np.array(unrealized_rsv)
 
                 else:
                     print("Cannot check the realized states")
@@ -129,8 +160,7 @@ class QPU:
             reordered_rsv = utils.reorder(self.stride, realized_rsv)
             print('two qubit: reordered', reordered_rsv)
 
-            # return after reshape for making a pair of rsv, (2,1) vector
-            return reordered_rsv, unrealized_rsv
+            # TODO: 1) Make the vmm function  2) Combine the realized and unrealized rsv
 
         else:
             print("No matched gate type!")

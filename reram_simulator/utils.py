@@ -38,7 +38,9 @@ def find_rs(rs, index):
 # reorder the rsv of each qubit state according to the stride value
 def reorder(stride, realized_rsv):
     length_of_rsv = np.shape(realized_rsv)[0]
-    
+
+    reorderd_rsv = []
+
     for i in range(0, length_of_rsv):
         upper_index = lower_index = 0
 
@@ -55,7 +57,7 @@ def reorder(stride, realized_rsv):
         # print('lower_index', lower_index)
         # print('lower_rsv', lower_rsv)
 
-        # combine and store in reorderd rsv
+        # combine and store in reordered rsv
         if i == 0:
             pair_rsv = np.vstack([[upper_rsv, lower_rsv]])
             reordered_rsv = pair_rsv
