@@ -1,20 +1,7 @@
-from scipy.linalg import block_diag
-from qiskit.circuit.random import random_circuit
 from qiskit import QuantumCircuit
-from qiskit.utils import *
-import numpy as np
-
-import utils
 from QPU import *
 import sys
 
-
-   
-    
-
-   
-
-# TODO: Fix the cascading problem of complex number from cross-sim
 if __name__ == "__main__":
     ############################
     ### Quantumcircuit setup ###
@@ -33,25 +20,24 @@ if __name__ == "__main__":
     # number of qubits
     n_qubits = qc.num_qubits
 
-    """
-    Initilize realized state amplitude
-    |000> = 1+0j
-    """
     # amplitudes = [[1+0j], [0+0j], [0+0j], [0+0j], [0+0j], ..., [0+0j]]
     rsv = np.array([[0, 1.0+0.0j, False]])
 
-    qpu = QPU()
+    qpu0 = QPU()
+    qpu1 = QPU()
 
     # FIXME: Modify the process that set_attribute for automatically
     # unpacking the quantum gate list
-    qpu.set_attribute(n_qubits, **gate_info_list[1])
+    qpu0.set_attribute(n_qubits, **gate_info_list[0])
+    qpu1.set_attribute(n_qubits, **gate_info_list[1])
 
-    # set the quanutm gate matrix called weight
-    qpu.set_weight(qc.data[1].operation)
+    # set the quantum gate matrix called weight
+    qpu0.set_weight(qc.data[0].operation)
+    qpu1.set_weight(qc.data[1].operation)
 
-    print(qpu.gate_type)
+    phase0 = qpu0.quantum_gate_process(rsv)
 
-    qpu.quantum_gate_process(rsv)
+    phase1 = qpu1.quantum_gate_process(phase0)
 
     # qpu.get_weight()
 

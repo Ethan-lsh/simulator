@@ -35,11 +35,15 @@ def find_rs(rs, index):
         t_rs = np.array([index, 0.0 + 0.0j, True])
         return t_rs
 
+
 # reorder the rsv of each qubit state according to the stride value
 def reorder(stride, realized_rsv):
-    length_of_rsv = np.shape(realized_rsv)[0]
+    # reshape
+    realized_rsv = np.reshape(realized_rsv, (-1, 3))
 
-    reorderd_rsv = []
+    length_of_rsv = realized_rsv.shape[0]
+
+    reordered_rsv = []
 
     for i in range(0, length_of_rsv):
         upper_index = lower_index = 0
@@ -81,7 +85,7 @@ def find_matrix(inst):
             gate_name = 'I'
     elif inst.name.find('c') == 0:
         gate_name = inst.name[1:].upper()
-        if gate_name == 'CX': gate_name = 'X'
+        if gate_name == 'cx': gate_name = 'x'
 
     params = inst.params
 
@@ -100,6 +104,8 @@ def find_matrix(inst):
     # print(gate_name)
     matrix = gate.to_matrix()
     return matrix
+
+
 
 
 def do_mvm(lrs, qmatrix):
