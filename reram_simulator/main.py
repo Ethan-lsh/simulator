@@ -1,3 +1,4 @@
+import numpy as np
 from qiskit import QuantumCircuit
 from QPU import *
 import sys
@@ -6,6 +7,15 @@ if __name__ == "__main__":
     ############################
     ### Quantumcircuit setup ###
     ############################
+
+    print('precision', np.get_printoptions())
+
+    # set the numpy precision
+    fpoint = 8
+    np.set_printoptions(precision=fpoint, floatmode='fixed', suppress=False)
+
+    print('precision', np.get_printoptions())
+
 
     # circuit = sys.argv[1]
 
@@ -35,7 +45,12 @@ if __name__ == "__main__":
     qpu0.set_weight(qc.data[0].operation)
     qpu1.set_weight(qc.data[1].operation)
 
+    qpu0.read_weight()
+    qpu1.read_weight()
+
     phase0 = qpu0.quantum_gate_process(rsv)
+    np.savetxt('test.csv', phase0, delimiter=',', header=f'{fpoint} precision \n'
+                                                         f'Qubit state \t Amplitude \t Status')
 
     phase1 = qpu1.quantum_gate_process(phase0)
 
