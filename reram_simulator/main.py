@@ -1,66 +1,59 @@
-import numpy as np
+from collections import OrderedDict
 from qiskit import QuantumCircuit
 from QPU import *
-import sys
+from precision import fpoint
+
+############################
+### Quantumcircuit setup ###
+############################
+
+# set the numpy precision
+fpoint = fpoint
+np.set_printoptions(precision=fpoint, floatmode='fixed', suppress=True)
+print('precision', np.get_printoptions())
+
+# circuit = sys.argv[1]
+
+# load the QuantumCircuit from qasm file
+# qc = QuantumCircuit.from_qasm_file(f'../qasm/TEST_QASMBench/{circuit}')
+qc = QuantumCircuit.from_qasm_file(f'../qasm/TEST_QASMBench/small/lpn_n5.qasm')
+
+# quantum gate information list
+gate_info_list = utils.clarify_gate_type(qc)
+# print(gate_info_list)
+
+# number of qubits
+n_qubits = qc.num_qubits
+
+# amplitudes = [[1+0j], [0+0j], [0+0j], [0+0j], [0+0j], ..., [0+0j]]
+rsv = np.array([[0, 1.0+0.0j, False]])
+
+# quantum processor
+# Contains all quantum processing unit instance
+qp = OrderedDict()
 
 if __name__ == "__main__":
-    ############################
-    ### Quantumcircuit setup ###
-    ############################
+    import warnings
+    warnings.simplefilter("ignore", np.ComplexWarning)
 
-    print('precision', np.get_printoptions())
+    # Make the quantum processing unit according to the number of quantum gates
+    for k in range(0, len(gate_info_list)):
+        qp["qpu"+str(k)] = QPU()
 
-    # set the numpy precision
-    fpoint = 8
-    np.set_printoptions(precision=fpoint, floatmode='fixed', suppress=False)
+        qp["qpu"+str(k)].set_attribute(n_qubits, **gate_info_list[k])
 
-    print('precision', np.get_printoptions())
+        qp["qpu"+str(k)].set_weight(qc.data[k].operation)
 
+    try:
+        for qpu in qp.values():
+            rsv = qpu.quantum_gate_process(rsv)
 
-    # circuit = sys.argv[1]
+        with open('test.csv', 'a') as csvfile:
+            np.savetxt(csvfile, rsv,
+                       delimiter=',',
+                       fmt=f'%.{fpoint}f',
+                       header=f'\n{fpoint} precision\n Qubit State \t Amplitude \t Status')
+    except StopIteration:
+        simulation_result = rsv
 
-    # load the QuantumCircuit from qasm file
-    # qc = QuantumCircuit.from_qasm_file(f'../qasm/TEST_QASMBench/{circuit}')
-    qc = QuantumCircuit.from_qasm_file(f'../qasm/TEST_QASMBench/small/lpn_n5.qasm')
-
-    # quantum gate information list
-    gate_info_list = utils.clarify_gate_type(qc)
-    # print(gate_info_list)
-
-    # number of qubits
-    n_qubits = qc.num_qubits
-
-    # amplitudes = [[1+0j], [0+0j], [0+0j], [0+0j], [0+0j], ..., [0+0j]]
-    rsv = np.array([[0, 1.0+0.0j, False]])
-
-    qpu0 = QPU()
-    qpu1 = QPU()
-
-    # FIXME: Modify the process that set_attribute for automatically
-    # unpacking the quantum gate list
-    qpu0.set_attribute(n_qubits, **gate_info_list[0])
-    qpu1.set_attribute(n_qubits, **gate_info_list[1])
-
-    # set the quantum gate matrix called weight
-    qpu0.set_weight(qc.data[0].operation)
-    qpu1.set_weight(qc.data[1].operation)
-
-    qpu0.read_weight()
-    qpu1.read_weight()
-
-    phase0 = qpu0.quantum_gate_process(rsv)
-    np.savetxt('test.csv', phase0, delimiter=',', header=f'{fpoint} precision \n'
-                                                         f'Qubit state \t Amplitude \t Status')
-
-    phase1 = qpu1.quantum_gate_process(phase0)
-
-    # qpu.get_weight()
-
-    # # emulate 'do-while'
-    # intermediate_result = QPU.calculate
-    # try:
-    #     for gate in gate_info_list[1:]:
-    #         intermediate_result = quantum_simulation(num_qubits, qpu, )
-    # except StopIteration:
-    #     quantum_simulation_result = intermediate_result
 

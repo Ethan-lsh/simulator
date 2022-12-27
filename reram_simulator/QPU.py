@@ -18,6 +18,7 @@ class QPU:
         self.stride = 0
         self.real_xbar = crossbar.make_core()  # real part of matrix
         self.imag_xbar = crossbar.make_core()  # imaginary part of matrix
+        self._num_gates = 1
 
     # set the input parameter
     def set_attribute(self, num_qubits, gate_name, gate_type, ccontrol_qubit, control_qubit, target_qubit):
@@ -28,13 +29,20 @@ class QPU:
         self.control_qubit = control_qubit
         self.target_qubit = target_qubit
 
+    # optimization function
+    def optimize(self, num_gates):
+        self._num_gates = num_gates
+
     # set the xbar weight
-    def set_weight(self, instruction):
-        # the number of matrix stored in the xbar
-        number_of_matrix = int(1024 / 1024)
+    def set_weight(self, instruction, optimization=None):
+        # default number of matrix stored in xbar
+        number_of_matrix = self._num_gates
+
+        if optimization is not None:
+            number_of_matrix = optimization
 
         matrix = utils.find_matrix(instruction)
-        print('Matrix::\n', matrix)
+        # print('Matrix::\n', matrix)
         # print('im', matrix.imag)
 
         # make the diagonal matrix both real and imaginary
@@ -62,19 +70,26 @@ class QPU:
         real_reordered_rsv = reordered_rsv.real
         img_reordered_rsv = reordered_rsv.imag
 
-        # For real part
-        # do the vector-matrix-multiplication
-        real_vmm_result = self.real_xbar.run_xbar_vmm(real_reordered_rsv[:, 1]) \
-                          - self.imag_xbar.run_xbar_vmm(img_reordered_rsv[:, 1])
+        # reshape the amplitude vector
+        row = 2**self._num_gates
+        column = int(len(reordered_rsv) / row)
+        real_amp = real_reordered_rsv[:, 1].reshape((row, column))
+        img_amp = img_reordered_rsv[:, 1].reshape((row, column))
 
-        # For imaginary part
-        # do the vector-matrix multiplication
-        img_vmm_result = self.real_xbar.run_xbar_vmm(img_reordered_rsv[:, 1]) \
-                          + self.imag_xbar.run_xbar_vmm(real_reordered_rsv[:, 1])
+        real_vmm_result = img_vmm_result = np.array([], dtype=complex).reshape(0, 2)
+        for j in range(0, column):
+            # real
+            real_xbar_output = self.real_xbar.run_xbar_vmm(real_amp[:, j: j+1]) - self.imag_xbar.run_xbar_vmm(img_amp[:, j:j+1])
+            real_vmm_result = np.vstack((real_vmm_result, real_xbar_output))
+
+            # imag
+            img_xbar_output = self.real_xbar.run_xbar_vmm(img_amp[:, j:j+1]) - self.imag_xbar.run_xbar_vmm(real_amp[:, j:j+1])
+            img_vmm_result = np.vstack((img_vmm_result, img_xbar_output))
 
         # combine real and img
         reordered_rsv[:, 1].real = real_vmm_result
         reordered_rsv[:, 1].imag = img_vmm_result
+
 
         return reordered_rsv
 
@@ -102,7 +117,7 @@ class QPU:
 
             # reset the rsv status
             next_rsv[:, 2] = False
-            print('QPU Output:: \n', next_rsv)
+            # print('QPU Output:: \n', next_rsv)
 
             return next_rsv
 
@@ -171,7 +186,7 @@ class QPU:
 
             # reset the rsv status
             next_rsv[:, 2] = False
-            print('QPU Output:: \n', next_rsv)
+            # print('QPU Output:: \n', next_rsv)
 
             return next_rsv
         else:

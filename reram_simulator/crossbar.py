@@ -1,7 +1,8 @@
 from cross_sim import MakeCore
 from cross_sim import Parameters
+from precision import fpoint
 
-fbit = 8
+
 
 def make_core():
     params = Parameters()
@@ -37,20 +38,20 @@ def make_core():
     params.algorithm_params.row_update.minimum = -1
 
     # D/A property
-    params.xbar_params.row_input.bits = fbit
+    params.xbar_params.row_input.bits = fpoint
     params.xbar_params.row_input.sign_bit = True
 
-    params.xbar_params.col_input.bits = fbit
+    params.xbar_params.col_input.bits = fpoint
     params.xbar_params.col_input.sign_bit = True
 
     params.xbar_params.row_input.normal_error_post.sigma = error_rate
     params.xbar_params.row_input.uniform_error_post.keep_within_range = True
 
     # A/D property
-    params.xbar_params.col_output.bits = fbit
+    params.xbar_params.col_output.bits = fpoint
     params.xbar_params.col_output.sign_bit = True
 
-    params.xbar_params.row_output.bits = fbit
+    params.xbar_params.row_output.bits = fpoint
     params.xbar_params.row_output.sign_bit = True
 
     # Read/write noise
