@@ -1,11 +1,10 @@
 import numpy as np
-import numpy.ma as ma
 from scipy.linalg import block_diag
 from bitstring import Bits, BitArray
 import crossbar
-from qiskit.circuit.library import *
 import utils
-
+import param
+from fxpmath import Fxp
 
 class QPU:
     def __init__(self):
@@ -41,9 +40,8 @@ class QPU:
         if optimization is not None:
             number_of_matrix = optimization
 
-        matrix = utils.find_matrix(instruction)
-        # print('Matrix::\n', matrix)
-        # print('im', matrix.imag)
+        # ! Make the fixed point matrix
+        matrix = Fxp(utils.find_matrix(instruction), signed=True, n_word=param.word, n_frac=param.frac)
 
         # make the diagonal matrix both real and imaginary
         real_weight = block_diag(*([matrix.real] * number_of_matrix))
@@ -66,6 +64,9 @@ class QPU:
 
     # matrix-vector multiplication function
     def vmm(self, reordered_rsv):
+        # ! Save reorder_rsv precision first
+        reordered_rsv.config.const_op_sizing = 'same'
+
         # divide the reordered rsv into real and imaginary vector
         real_reordered_rsv = reordered_rsv.real
         img_reordered_rsv = reordered_rsv.imag
@@ -76,20 +77,23 @@ class QPU:
         real_amp = real_reordered_rsv[:, 1].reshape((row, column))
         img_amp = img_reordered_rsv[:, 1].reshape((row, column))
 
+        real = img = None
         real_vmm_result = img_vmm_result = np.array([], dtype=complex).reshape(0, 2)
         for j in range(0, column):
             # real
             real_xbar_output = self.real_xbar.run_xbar_vmm(real_amp[:, j: j+1]) - self.imag_xbar.run_xbar_vmm(img_amp[:, j:j+1])
             real_vmm_result = np.vstack((real_vmm_result, real_xbar_output))
+            real = Fxp(real_vmm_result, signed=True, n_word=param.word, n_frac=param.frac)
+            real.config.op_sizing = 'same'
 
             # imag
             img_xbar_output = self.real_xbar.run_xbar_vmm(img_amp[:, j:j+1]) - self.imag_xbar.run_xbar_vmm(real_amp[:, j:j+1])
             img_vmm_result = np.vstack((img_vmm_result, img_xbar_output))
+            img = Fxp(img_vmm_result, signed=True, n_word=param.word, n_frac=param.frac)
+            img.config.op_sizing = 'same'
 
         # combine real and img
-        reordered_rsv[:, 1].real = real_vmm_result
-        reordered_rsv[:, 1].imag = img_vmm_result
-
+        reordered_rsv[:, 1] = real + img
 
         return reordered_rsv
 
@@ -119,6 +123,7 @@ class QPU:
             next_rsv[:, 2] = False
             # print('QPU Output:: \n', next_rsv)
 
+            # ! Return as Fxp object
             return next_rsv
 
         elif self.gate_type == 'two_qubit_gate':
@@ -137,7 +142,7 @@ class QPU:
             unrealized_index = []
 
             # find the realized rsv
-            for k in range(0, np.shape(rsv)[0]):
+            for k in range(0, list(rsv.shape)[0]):
                 # extract the offset(=index)
                 offset = int(rsv[k][0])
 
@@ -174,8 +179,9 @@ class QPU:
             next_rsv = self.vmm(reordered_rsv)
 
             if len(unrealized_rsv) != 0:
+                # NOTICE Fxp object cannot implement np.vstack
                 # combine with unrealized rsv
-                next_rsv = np.vstack((next_rsv, unrealized_rsv))
+                next_rsv = np.vstack((next_rsv.get_val(), unrealized_rsv.get_val()))
 
                 # remove the zero amplitudes
                 next_rsv = next_rsv[~np.any(next_rsv[:, 1].reshape((-1, 1)) == 0, axis=1)]
@@ -188,7 +194,10 @@ class QPU:
             next_rsv[:, 2] = False
             # print('QPU Output:: \n', next_rsv)
 
+            # ! Return as Fxp object
+            next_rsv = Fxp(next_rsv, signed=True, n_word=param.word, n_frac=param.frac)
             return next_rsv
+
         else:
             print("No matched gate type!")
 

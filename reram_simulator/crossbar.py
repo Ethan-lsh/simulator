@@ -1,7 +1,6 @@
 from cross_sim import MakeCore
 from cross_sim import Parameters
-from precision import fpoint
-
+from param import word
 
 
 def make_core():
@@ -16,20 +15,21 @@ def make_core():
     # xbar weight
     params.algorithm_params.weights.maximum = 1
     params.algorithm_params.weights.minimum = -1
+
     params.xbar_params.weights.maximum = 1
     params.xbar_params.weights.minimum = -1
 
     # xbar input
-    params.algorithm_params.col_input.maximum = 1.0
-    params.algorithm_params.col_input.minimum = -1.0
-    params.algorithm_params.row_input.maximum = 1.0
-    params.algorithm_params.row_input.minimum = -1.0
+    params.algorithm_params.col_input.maximum = 3
+    params.algorithm_params.col_input.minimum = -3
+    params.algorithm_params.row_input.maximum = 3
+    params.algorithm_params.row_input.minimum = -3
 
     # xbar output
-    params.algorithm_params.col_output.maximum = 1
-    params.algorithm_params.col_output.minimum = -1
-    params.algorithm_params.row_output.maximum = 1
-    params.algorithm_params.row_output.minimum = -1
+    params.algorithm_params.col_output.maximum = 3
+    params.algorithm_params.col_output.minimum = -3
+    params.algorithm_params.row_output.maximum = 3
+    params.algorithm_params.row_output.minimum = -3
 
     # xbar update
     params.algorithm_params.col_update.maximum = 1
@@ -37,22 +37,26 @@ def make_core():
     params.algorithm_params.row_update.maximum = 1
     params.algorithm_params.row_update.minimum = -1
 
+    # weight precision
+    params.xbar_params.weights.bits = word
+    params.xbar_params.weights.sign_bit = True
+
     # D/A property
-    params.xbar_params.row_input.bits = fpoint
+    params.xbar_params.row_input.bits = word
     params.xbar_params.row_input.sign_bit = True
 
-    params.xbar_params.col_input.bits = fpoint
+    params.xbar_params.col_input.bits = word
     params.xbar_params.col_input.sign_bit = True
+
+    # A/D property
+    params.xbar_params.col_output.bits = word
+    params.xbar_params.col_output.sign_bit = True
+
+    params.xbar_params.row_output.bits = word
+    params.xbar_params.row_output.sign_bit = True
 
     params.xbar_params.row_input.normal_error_post.sigma = error_rate
     params.xbar_params.row_input.uniform_error_post.keep_within_range = True
-
-    # A/D property
-    params.xbar_params.col_output.bits = fpoint
-    params.xbar_params.col_output.sign_bit = True
-
-    params.xbar_params.row_output.bits = fpoint
-    params.xbar_params.row_output.sign_bit = True
 
     # Read/write noise
     params.numeric_params.read_noise.sigma = error_rate

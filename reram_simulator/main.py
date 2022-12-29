@@ -1,15 +1,16 @@
 from collections import OrderedDict
 from qiskit import QuantumCircuit
 from QPU import *
-from precision import fpoint
+import param
+import utils
+from fxpmath import Fxp
 
 ############################
 ### Quantumcircuit setup ###
 ############################
 
 # set the numpy precision
-fpoint = fpoint
-np.set_printoptions(precision=fpoint, floatmode='fixed', suppress=True)
+np.set_printoptions(precision=param.word, floatmode='fixed', suppress=True)
 print('precision', np.get_printoptions())
 
 # circuit = sys.argv[1]
@@ -26,12 +27,13 @@ gate_info_list = utils.clarify_gate_type(qc)
 n_qubits = qc.num_qubits
 
 # amplitudes = [[1+0j], [0+0j], [0+0j], [0+0j], [0+0j], ..., [0+0j]]
-rsv = np.array([[0, 1.0+0.0j, False]])
+rsv = Fxp(np.array([[0, 1.0+0.0j, False]]), signed=True, n_word=param.word, n_frac=param.frac)
 
 # quantum processor
 # Contains all quantum processing unit instance
 qp = OrderedDict()
 
+# TODO: Realize the multi-bank option
 if __name__ == "__main__":
     import warnings
     warnings.simplefilter("ignore", np.ComplexWarning)
@@ -44,16 +46,22 @@ if __name__ == "__main__":
 
         qp["qpu"+str(k)].set_weight(qc.data[k].operation)
 
+        qp["qpu"+str(k)].read_weight()
+
     try:
         for qpu in qp.values():
             rsv = qpu.quantum_gate_process(rsv)
+            print('Phase result:', rsv)
 
-        with open('test.csv', 'a') as csvfile:
-            np.savetxt(csvfile, rsv,
-                       delimiter=',',
-                       fmt=f'%.{fpoint}f',
-                       header=f'\n{fpoint} precision\n Qubit State \t Amplitude \t Status')
-    except StopIteration:
+
+        # with open('test.csv', 'a') as csvfile:
+        #     np.savetxt(csvfile, rsv,
+        #                delimiter=',',
+        #                fmt=f'%.{fpoint}f',
+        #                header=f'\n{fpoint} precision\n Qubit State \t Amplitude \t Status')
+        #
+        #     csvfile.write(f'{cosine_distance}')
+
+    except ValueError as error:
         simulation_result = rsv
-
-
+        print(error)

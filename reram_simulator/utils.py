@@ -3,8 +3,9 @@ from qiskit.quantum_info import Statevector
 from qiskit.circuit.library import *
 from qiskit.circuit import QuantumRegister, ClassicalRegister, QuantumCircuit
 import numpy as np
-import sys
-from bitstring import BitArray
+from fxpmath import Fxp
+import param
+
 
 """
 Module for calculate execution time and clarify the quantum gate type
@@ -17,12 +18,6 @@ OL_read = 3.9984  # Read latency (nanosecond)
 OL_write = 6.4441  # Write latency (nanosecond)
 crossbar_capacity = 1024 * 1024  # rows x columns
 N_burst = 512  # 64bytes burst write
-
-
-def cal_stride(target_qubit):
-    # calculate the stride value
-    stride = 1 << target_qubit
-    return stride
 
 
 def find_rs(rs, index):
@@ -57,16 +52,16 @@ def reorder(stride, realized_rsv):
         lower_index = upper_index + stride
         lower_rsv = find_rs(realized_rsv, lower_index)
 
-        # print('upper_rsv', upper_rsv)
-        # print('lower_index', lower_index)
-        # print('lower_rsv', lower_rsv)
-
         # combine and store in reordered rsv
         if i == 0:
             pair_rsv = np.vstack([[upper_rsv, lower_rsv]])
             reordered_rsv = pair_rsv
         elif i > 0:
             pair_rsv = np.vstack([[reordered_rsv, upper_rsv, lower_rsv]])
+
+    # ! Make the Fxp object with 'same' precision
+    reordered_rsv = Fxp(reordered_rsv, signed=True, n_word=param.word, n_frac=param.frac)
+    reordered_rsv.config.const_op_sizing = 'same'
 
     return reordered_rsv
 
@@ -106,145 +101,14 @@ def find_matrix(inst):
     return matrix
 
 
+def cosine(x, y):
+    import numpy as np
+    from numpy.linalg import norm
 
+    cosine_similarity = np.dot(x, y)/(norm(x)*norm(y))
+    print('cosine similarity', cosine_similarity)
+    return cosine_similarity
 
-def do_mvm(lrs, qmatrix):
-    # split the lrs into 3-pars
-    # value of qubit state
-    value = lrs[:, 0].reshape(-1, 1)
-
-    # amplitude of qubit state
-    amp = lrs[:, 1]
-
-    # status of qubit state
-    state = lrs[:, 2].reshape(-1, 1)
-
-    # make the lrs into ndarray(-1, 2, 1)
-    amp = amp.reshape([-1, 2, 1])
-
-    # matmul with broadcasting
-    mvm_result = np.matmul(qmatrix, amp).reshape((-1, 1))
-
-    # find the non-zero value
-    no_zero_index = np.nonzero(mvm_result)
-    # print('non zero index', no_zero_index)
-
-    # no zero value of qubit state
-    no_zero_value = value[no_zero_index].reshape((-1, 1))
-    # print(no_zero_value)
-
-    # no zero amplitude of qubit state
-    no_zero_amp = mvm_result[no_zero_index].reshape((-1, 1))
-    # print(no_zero_amp)
-
-    # no zero state of qubit state
-    no_zero_state = state[no_zero_index].reshape((-1, 1))
-    # print(no_zero_state)
-
-    if no_zero_value.ndim == 1:
-        new_lrs = np.concatenate((no_zero_value, no_zero_amp, no_zero_state), axis=0)
-        new_lrs = np.array([new_lrs])
-        new_lrs[0, 2] = False
-    else:
-        new_lrs = np.concatenate((no_zero_value, no_zero_amp, no_zero_state), axis=1)
-        new_lrs[:, 2] = False
-
-    # print(new_lrs)
-
-    return new_lrs
-
-
-def eval_etri(qc, gates, kind_of_gates):
-    # initial statevector
-    lrs = np.array([[0, 1.0 + 0.0j, False]])
-
-    T_extract = T_extract_m = 0    # No optimized read time
-    OT_extract = OT_extract_m = 0  # Optimization read time
-    TT_reorder = 0 # total reordering time
-
-    mem_for_read = 0
-    Mem_for_read = 0 # total memory for read
-
-    
-    for i in range(0, len(gates)):
-        # find the upper and lower array
-        stride = 1 << gates[i]['target_qubit']
-        # print('stride:', stride, "count:", i)
-
-        length_of_rs = np.shape(lrs)[0]
-
-        T_reorder = L_read * length_of_rs
-        TT_reorder += T_reorder
-        Mem_for_read += mem_for_read
-
-        # reordering code block
-        for j in range(0, length_of_rs):
-            
-            upper_index = lower_index = 0
-
-            upper_index = lrs[j][0].real
-            upper_rs = find_rs(lrs, upper_index)
-
-            if upper_rs is None or []:
-                continue
-
-            lower_index = upper_index + stride
-            lower_rs = find_rs(lrs, lower_index)
-
-            # combine and update
-            if j == 0:
-                pair_lrs = np.vstack([upper_rs, lower_rs])
-                next_lrs = pair_lrs
-            elif j > 0:
-                next_lrs = np.vstack([next_lrs, upper_rs, lower_rs])
-
-        lrs = next_lrs
-        # print('previous lrs\n', lrs)
-        # print('-'*40)
-
-        # find the quantum gate matrix
-        qmatrix = find_matrix(qc.data[i].operation)
-        # print('qmatrix\n', qmatrix, end='\n')
-        # print('-'*40)
-
-        lrs = do_mvm(lrs, qmatrix)
-
-        length_of_lrs = len(lrs)
-        # print('length of lrs: ', length_of_lrs)
-
-        slice_of_lrs = length_of_lrs / 2
-        mem_for_read = length_of_lrs * 16
-        # print('slice of lrs', slice_of_lrs)
-
-        T_extract_m = (L_read * slice_of_lrs * 2)
-        T_extract += T_extract_m
-
-        if length_of_lrs <= 512:
-            OT_extract_m = OL_read * 2
-        elif length_of_lrs > 512:
-            OT_extract_m = OL_read * (length_of_lrs / pow(2, 9)) * 2
-
-        OT_extract += OT_extract_m
-
-
-    T_load = (2 * 2) * L_write
-    T_exec = T_load + T_extract    
-
-    OT_load = 1024 * OL_write * (1024 / N_burst)
-    OT_exec = OT_load + OT_extract
-
-    print('Total reordering time', TT_reorder)
-    print(f"Total read memory consumption: {Mem_for_read} bit\n"
-          f"#### ETRI method on Crossbar (ns) ####\n"
-          f"\n#### No optimized ####\n"
-          f"Load time: {T_load}\n"
-          f"Extraction time: {T_extract}\n"
-          f"Total: {T_exec}\n"
-          f"\n#### Optimized ####\n"
-          f"Load time: {OT_load}\n"
-          f"Extract time: {OT_extract}\n"
-          f"Total: {OT_exec}\n")
-    
 
 def eval_qiskit(qc, num_of_cores, processor_type="CPU"):
     qc.measure_all()
@@ -303,30 +167,3 @@ def clarify_gate_type(qc):
                                 "target_qubit": target_qubit})
 
     return gate_info_list
-
-
-def evaluate():
-    param = sys.argv[1]
-
-    qc = QuantumCircuit.from_qasm_file(f'../qasm/TEST_QASMBench/{param}')
-
-
-    gate_infos = clarify_gate_type(qc)
-    # print('gate_infos', gate_infos, end='\n')
-
-    num_of_qubits = qc.num_qubits
-
-    kind_of_gates = len(qc.count_ops())
-    # print('kind of gates', num_of_gates)
-
-    # length_of_circuits = len(gate_info)
-
-    print(f"============== Crossbar Array : 512 x 512 =============")
-    # print(f"-------------- {param} qubits ----------------")
-    
-    # calculate_crossbar_exec_time(num_of_qubits, kind_of_gates, gate_infos)
-    
-    eval_etri(qc, gate_infos, kind_of_gates)
-    
-    eval_qiskit(qc, processor_type="CPU", num_of_cores=24)
-
