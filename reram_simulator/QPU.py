@@ -64,9 +64,6 @@ class QPU:
 
     # matrix-vector multiplication function
     def vmm(self, reordered_rsv):
-        # ! Save reorder_rsv precision first
-        reordered_rsv.config.const_op_sizing = 'same'
-
         # divide the reordered rsv into real and imaginary vector
         real_reordered_rsv = reordered_rsv.real
         img_reordered_rsv = reordered_rsv.imag
@@ -83,13 +80,17 @@ class QPU:
             # real
             real_xbar_output = self.real_xbar.run_xbar_vmm(real_amp[:, j: j+1]) - self.imag_xbar.run_xbar_vmm(img_amp[:, j:j+1])
             real_vmm_result = np.vstack((real_vmm_result, real_xbar_output))
-            real = Fxp(real_vmm_result, signed=True, n_word=param.word, n_frac=param.frac)
+
+            # NOTICE The fixed point result should be double size of operand
+            real = Fxp(real_vmm_result, signed=True, n_word=param.word*2, n_frac=param.frac*2)
             real.config.op_sizing = 'same'
 
             # imag
             img_xbar_output = self.real_xbar.run_xbar_vmm(img_amp[:, j:j+1]) - self.imag_xbar.run_xbar_vmm(real_amp[:, j:j+1])
             img_vmm_result = np.vstack((img_vmm_result, img_xbar_output))
-            img = Fxp(img_vmm_result, signed=True, n_word=param.word, n_frac=param.frac)
+
+            # NOTICE The fixed point result should be double size of operand
+            img = Fxp(img_vmm_result, signed=True, n_word=param.word*2, n_frac=param.frac*2)
             img.config.op_sizing = 'same'
 
         # combine real and img
@@ -195,7 +196,7 @@ class QPU:
             # print('QPU Output:: \n', next_rsv)
 
             # ! Return as Fxp object
-            next_rsv = Fxp(next_rsv, signed=True, n_word=param.word, n_frac=param.frac)
+            next_rsv = Fxp(next_rsv, signed=True, n_word=param.word*2, n_frac=param.frac*2)
             return next_rsv
 
         else:

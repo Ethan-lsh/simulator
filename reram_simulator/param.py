@@ -1,2 +1,3 @@
-word = 8
-frac = 5
+decimal = 4
+frac = 3
+word = decimal + frac

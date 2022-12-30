@@ -101,15 +101,6 @@ def find_matrix(inst):
     return matrix
 
 
-def cosine(x, y):
-    import numpy as np
-    from numpy.linalg import norm
-
-    cosine_similarity = np.dot(x, y)/(norm(x)*norm(y))
-    print('cosine similarity', cosine_similarity)
-    return cosine_similarity
-
-
 def eval_qiskit(qc, num_of_cores, processor_type="CPU"):
     qc.measure_all()
 

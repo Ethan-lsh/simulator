@@ -4,13 +4,14 @@ from QPU import *
 import param
 import utils
 from fxpmath import Fxp
+from scipy.spatial import distance
 
 ############################
 ### Quantumcircuit setup ###
 ############################
 
 # set the numpy precision
-np.set_printoptions(precision=param.word, floatmode='fixed', suppress=True)
+np.set_printoptions(precision=param.frac, floatmode='fixed', suppress=True)
 print('precision', np.get_printoptions())
 
 # circuit = sys.argv[1]
@@ -51,16 +52,16 @@ if __name__ == "__main__":
     try:
         for qpu in qp.values():
             rsv = qpu.quantum_gate_process(rsv)
-            print('Phase result:', rsv)
+            print('Phase result: \n', rsv)
 
+        cosine_distance = distance.cosine([0.70710678+0.j, 0.70710678+0.j], rsv[:, 1])
+        print('cosine distance %5.12f\n' % cosine_distance)
 
-        # with open('test.csv', 'a') as csvfile:
-        #     np.savetxt(csvfile, rsv,
-        #                delimiter=',',
-        #                fmt=f'%.{fpoint}f',
-        #                header=f'\n{fpoint} precision\n Qubit State \t Amplitude \t Status')
-        #
-        #     csvfile.write(f'{cosine_distance}')
+        with open('test.csv', 'a') as csvfile:
+            np.savetxt(csvfile, rsv,
+                       delimiter=',',
+                       fmt=f'%.{param.word}f',
+                       header=f'\n {param.frac} fraction \n Qubit State \t Amplitude \t Status')
 
     except ValueError as error:
         simulation_result = rsv
