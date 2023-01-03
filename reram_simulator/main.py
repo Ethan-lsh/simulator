@@ -4,11 +4,7 @@ from QPU import *
 import param
 import utils
 from fxpmath import Fxp
-from scipy.spatial import distance
 
-############################
-### Quantumcircuit setup ###
-############################
 
 # set the numpy precision
 np.set_printoptions(precision=param.frac, floatmode='fixed', suppress=True)
@@ -47,15 +43,12 @@ if __name__ == "__main__":
 
         qp["qpu"+str(k)].set_weight(qc.data[k].operation)
 
-        qp["qpu"+str(k)].read_weight()
+        # qp["qpu"+str(k)].read_weight()
 
     try:
         for qpu in qp.values():
             rsv = qpu.quantum_gate_process(rsv)
-            print('Phase result: \n', rsv)
-
-        cosine_distance = distance.cosine([0.70710678+0.j, 0.70710678+0.j], rsv[:, 1])
-        print('cosine distance %5.12f\n' % cosine_distance)
+            print('# Phase result :: \n', rsv)
 
         with open('test.csv', 'a') as csvfile:
             np.savetxt(csvfile, rsv,

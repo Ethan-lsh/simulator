@@ -5,6 +5,11 @@ import crossbar
 import utils
 import param
 from fxpmath import Fxp
+from inspect import currentframe, getframeinfo
+
+cf = currentframe()
+filename = getframeinfo(cf).filename
+
 
 class QPU:
     def __init__(self):
@@ -82,7 +87,7 @@ class QPU:
             real_vmm_result = np.vstack((real_vmm_result, real_xbar_output))
 
             # NOTICE The fixed point result should be double size of operand
-            real = Fxp(real_vmm_result, signed=True, n_word=param.word*2, n_frac=param.frac*2)
+            real = Fxp(real_vmm_result, signed=True, n_word=param.word, n_frac=param.frac)
             real.config.op_sizing = 'same'
 
             # imag
@@ -90,7 +95,7 @@ class QPU:
             img_vmm_result = np.vstack((img_vmm_result, img_xbar_output))
 
             # NOTICE The fixed point result should be double size of operand
-            img = Fxp(img_vmm_result, signed=True, n_word=param.word*2, n_frac=param.frac*2)
+            img = Fxp(img_vmm_result, signed=True, n_word=param.word, n_frac=param.frac)
             img.config.op_sizing = 'same'
 
         # combine real and img
@@ -118,13 +123,17 @@ class QPU:
             next_rsv = self.vmm(reordered_rsv)
 
             # remove the zero amplitude state
-            next_rsv = next_rsv[np.where(next_rsv[:, 1] != 0)]
+            try:
+                next_rsv = next_rsv[np.where(next_rsv[:, 1] != 0)]
+            except IndexError:
+                print('Index error\n')
 
             # reset the rsv status
             next_rsv[:, 2] = False
             # print('QPU Output:: \n', next_rsv)
 
             # ! Return as Fxp object
+            next_rsv = Fxp(next_rsv, signed=True, n_word=param.word, n_frac=param.frac)
             return next_rsv
 
         elif self.gate_type == 'two_qubit_gate':
@@ -172,7 +181,7 @@ class QPU:
                     unrealized_rsv = np.append(unrealized_rsv, rsv[offset])
 
                 else:
-                    print("Cannot check the realized states")
+                    print("Cannot check the realized states", cf.f_back.f_lineno)
 
             reordered_rsv = utils.reorder(self.stride, realized_rsv)
             # print('two qubit: reordered\n', reordered_rsv)
@@ -196,7 +205,81 @@ class QPU:
             # print('QPU Output:: \n', next_rsv)
 
             # ! Return as Fxp object
-            next_rsv = Fxp(next_rsv, signed=True, n_word=param.word*2, n_frac=param.frac*2)
+            next_rsv = Fxp(next_rsv, signed=True, n_word=param.word, n_frac=param.frac)
+            return next_rsv
+
+        elif self.gate_type == 'three_qubit_gate':
+            # initialize the empty list to store the realized states
+            realized_rsv = []
+
+            # initialize the empty np_arr to store the unrealized states
+            unrealized_rsv = []
+
+            # convert the decimal control_qubit into the binary representation
+            # if control qubit index is 1, the bin_control_qubit should be |010> (2nd => |100>)
+            bin_ccontrol_qubit = BitArray(uint=1 << self.ccontrol_qubit, length=self.num_qubits)
+            bin_control_qubit = BitArray(uint=1 << self.control_qubit, length=self.num_qubits)
+
+            # make the empty index list for unrealized rsv
+            realized_index = []
+            unrealized_index = []
+
+            # find the realized rsv
+            for k in range(0, list(rsv.shape)[0]):
+                # extract the offset(=index)
+                offset = int(rsv[k][0])
+
+                # convert the decimal offset into the binary representation
+                bin_offset = BitArray(uint=offset, length=self.num_qubits)
+
+                # check the offset has the control index as 1
+                # ex) |010> & |000> = 0, |010> & |001> = 0, |010> & |010> > 0, ...
+                enable = bin_control_qubit & bin_offset
+                eenable = bin_control_qubit & bin_offset
+
+                # enable = 1 if rsv[offset][1] > 0 else 0
+
+                # when enable == 1, it means the qubit of control index on offset is '1' named 'realized'
+                if enable.uint > 0 & eenable.uint > 0:
+                    # add the realized index
+                    realized_index = np.append(realized_index, offset)
+
+                    # add the realized rsv
+                    realized_rsv = np.append(realized_rsv, rsv[offset])
+
+                elif enable.uint == 0 & eenable.uint == 0:
+                    # add the unrealized index
+                    unrealized_index = np.append(unrealized_rsv, offset)
+
+                    # add the unrealized rsv
+                    unrealized_rsv = np.append(unrealized_rsv, rsv[offset])
+
+                else:
+                    print("Cannot check the realized states", cf.f_back.f_lineno)
+
+            reordered_rsv = utils.reorder(self.stride, realized_rsv)
+            # print('two qubit: reordered\n', reordered_rsv)
+
+            next_rsv = self.vmm(reordered_rsv)
+
+            if len(unrealized_rsv) != 0:
+                # NOTICE Fxp object cannot implement np.vstack
+                # combine with unrealized rsv
+                next_rsv = np.vstack((next_rsv.get_val(), unrealized_rsv.get_val()))
+
+                # remove the zero amplitudes
+                next_rsv = next_rsv[~np.any(next_rsv[:, 1].reshape((-1, 1)) == 0, axis=1)]
+
+            else:
+                # remove the zero amplitudes
+                next_rsv = next_rsv[np.where(next_rsv[:, 1] != 0)]
+
+            # reset the rsv status
+            next_rsv[:, 2] = False
+            # print('QPU Output:: \n', next_rsv)
+
+            # ! Return as Fxp object
+            next_rsv = Fxp(next_rsv, signed=True, n_word=param.word, n_frac=param.frac)
             return next_rsv
 
         else:

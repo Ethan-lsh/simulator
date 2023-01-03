@@ -1,6 +1,7 @@
+import cross_sim
 from cross_sim import MakeCore
 from cross_sim import Parameters
-from param import word
+from param import frac
 
 
 def make_core():
@@ -38,21 +39,21 @@ def make_core():
     params.algorithm_params.row_update.minimum = -1
 
     # weight precision
-    params.xbar_params.weights.bits = word
+    params.xbar_params.weights.bits = frac
     params.xbar_params.weights.sign_bit = True
 
     # D/A property
-    params.xbar_params.row_input.bits = word
+    params.xbar_params.row_input.bits = frac
     params.xbar_params.row_input.sign_bit = True
 
-    params.xbar_params.col_input.bits = word
+    params.xbar_params.col_input.bits = frac
     params.xbar_params.col_input.sign_bit = True
 
     # A/D property
-    params.xbar_params.col_output.bits = word
+    params.xbar_params.col_output.bits = frac
     params.xbar_params.col_output.sign_bit = True
 
-    params.xbar_params.row_output.bits = word
+    params.xbar_params.row_output.bits = frac
     params.xbar_params.row_output.sign_bit = True
 
     params.xbar_params.row_input.normal_error_post.sigma = error_rate

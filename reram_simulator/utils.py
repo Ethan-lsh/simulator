@@ -20,6 +20,14 @@ crossbar_capacity = 1024 * 1024  # rows x columns
 N_burst = 512  # 64bytes burst write
 
 
+def square_magnitude(vector):
+    return sum(x*x for x in vector)
+
+
+def inaccuracy(pred, test):
+    return square_magnitude([pred[i] - test[i] for i in range(len(pred))]) / len(pred)
+
+
 def find_rs(rs, index):
     try:
         value = np.where(rs[:, 0] == index)[0].real[0]
@@ -80,7 +88,10 @@ def find_matrix(inst):
             gate_name = 'I'
     elif inst.name.find('c') == 0:
         gate_name = inst.name[1:].upper()
-        if gate_name == 'cx': gate_name = 'x'
+        if gate_name == 'CX': # CX gate
+            gate_name = 'X'
+        elif gate_name == 'CCX':  # CCX gate
+            gate_name = 'X'
 
     params = inst.params
 
