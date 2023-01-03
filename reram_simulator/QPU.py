@@ -101,6 +101,7 @@ class QPU:
         # combine real and img
         reordered_rsv[:, 1] = real + img
 
+        # NOTICE The vmm result is Fxp object
         return reordered_rsv
 
     # qubit gate operation depends on the gate type
@@ -132,8 +133,6 @@ class QPU:
             next_rsv[:, 2] = False
             # print('QPU Output:: \n', next_rsv)
 
-            # ! Return as Fxp object
-            next_rsv = Fxp(next_rsv, signed=True, n_word=param.word, n_frac=param.frac)
             return next_rsv
 
         elif self.gate_type == 'two_qubit_gate':
@@ -196,17 +195,15 @@ class QPU:
                 # remove the zero amplitudes
                 next_rsv = next_rsv[~np.any(next_rsv[:, 1].reshape((-1, 1)) == 0, axis=1)]
 
+                next_rsv[:, 2] = False
+
+                return Fxp(next_rsv, signed=True, n_word=param.word, n_frac=param.frac)
+
             else:
                 # remove the zero amplitudes
                 next_rsv = next_rsv[np.where(next_rsv[:, 1] != 0)]
 
-            # reset the rsv status
-            next_rsv[:, 2] = False
-            # print('QPU Output:: \n', next_rsv)
-
-            # ! Return as Fxp object
-            next_rsv = Fxp(next_rsv, signed=True, n_word=param.word, n_frac=param.frac)
-            return next_rsv
+                return next_rsv
 
         elif self.gate_type == 'three_qubit_gate':
             # initialize the empty list to store the realized states
@@ -270,17 +267,16 @@ class QPU:
                 # remove the zero amplitudes
                 next_rsv = next_rsv[~np.any(next_rsv[:, 1].reshape((-1, 1)) == 0, axis=1)]
 
+                next_rsv[:, 2] = False
+
+                return Fxp(next_rsv, signed=True, n_word=param.word, n_frac=param.frac)
+
             else:
                 # remove the zero amplitudes
                 next_rsv = next_rsv[np.where(next_rsv[:, 1] != 0)]
+                next_rsv[:, 2] = False
 
-            # reset the rsv status
-            next_rsv[:, 2] = False
-            # print('QPU Output:: \n', next_rsv)
-
-            # ! Return as Fxp object
-            next_rsv = Fxp(next_rsv, signed=True, n_word=param.word, n_frac=param.frac)
-            return next_rsv
+                return next_rsv
 
         else:
             print("No matched gate type!")
