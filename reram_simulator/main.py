@@ -14,7 +14,7 @@ print('precision', np.get_printoptions())
 
 # load the QuantumCircuit from qasm file
 # qc = QuantumCircuit.from_qasm_file(f'../qasm/TEST_QASMBench/{circuit}')
-qc = QuantumCircuit.from_qasm_file(f'../qasm/TEST_QASMBench/small/lpn_n5.qasm')
+qc = QuantumCircuit.from_qasm_file(f'../qasm/TEST_QASMBench/small/deutsch_n2.qasm')
 
 # quantum gate information list
 gate_info_list = utils.clarify_gate_type(qc)
@@ -49,8 +49,10 @@ if __name__ == "__main__":
         for qpu in qp.values():
             rsv = qpu.quantum_gate_process(rsv)
             print('# Phase result :: \n', rsv)
+            print('\n')
 
         with open('test.csv', 'a') as csvfile:
+            # csvfile.write('deutsch_n2.qasm\n')
             np.savetxt(csvfile, rsv,
                        delimiter=',',
                        fmt=f'%.{param.word}f',

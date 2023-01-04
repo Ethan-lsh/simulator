@@ -68,38 +68,48 @@ class QPU:
             print("The target index is larger than the qubits range")
 
     # matrix-vector multiplication function
-    def vmm(self, reordered_rsv):
+    def vmm(self, reordered_rsv, n_stride):
         # divide the reordered rsv into real and imaginary vector
         real_reordered_rsv = reordered_rsv.real
         img_reordered_rsv = reordered_rsv.imag
 
         # reshape the amplitude vector
         row = 2**self._num_gates
-        column = int(len(reordered_rsv) / row)
-        real_amp = real_reordered_rsv[:, 1].reshape((row, column))
-        img_amp = img_reordered_rsv[:, 1].reshape((row, column))
+        column = len(reordered_rsv)
 
         real = img = None
         real_vmm_result = img_vmm_result = np.array([], dtype=complex).reshape(0, 2)
-        for j in range(0, column):
-            # real
-            real_xbar_output = self.real_xbar.run_xbar_vmm(real_amp[:, j: j+1]) - self.imag_xbar.run_xbar_vmm(img_amp[:, j:j+1])
-            real_vmm_result = np.vstack((real_vmm_result, real_xbar_output))
+        for j in range(0, column, 2):
+            # real_amp = real_reordered_rsv[j:j+2, 1]
+            real_amp = real_reordered_rsv[j:j+2]
+            real_amp = real_amp[real_amp[:, 0].argsort()]
 
-            # NOTICE The fixed point result should be double size of operand
-            real = Fxp(real_vmm_result, signed=True, n_word=param.word, n_frac=param.frac)
-            real.config.op_sizing = 'same'
+            # img_amp = img_reordered_rsv[j:j+2, 1]
+            img_amp = img_reordered_rsv[j:j+2]
+            img_amp = img_amp[img_amp[:, 0].argsort()]
 
-            # imag
-            img_xbar_output = self.real_xbar.run_xbar_vmm(img_amp[:, j:j+1]) - self.imag_xbar.run_xbar_vmm(real_amp[:, j:j+1])
-            img_vmm_result = np.vstack((img_vmm_result, img_xbar_output))
+            real_xbar_output = self.real_xbar.run_xbar_mvm(real_amp[:, 1]) - self.imag_xbar.run_xbar_mvm(img_amp[:, 1])
+            img_xbar_output = self.real_xbar.run_xbar_mvm(img_amp[:, 1]) + self.imag_xbar.run_xbar_mvm(real_amp[:, 1])
+            
+            if n_stride > 0:
+                real_vmm_result = np.vstack((real_vmm_result, real_xbar_output))
+                img_vmm_result = np.vstack((img_vmm_result, img_xbar_output))
+            else:
+                real_vmm_result = np.vstack((real_vmm_result, real_xbar_output[::-1]))
+                img_vmm_result = np.vstack((img_vmm_result, img_xbar_output[::-1]))
 
-            # NOTICE The fixed point result should be double size of operand
-            img = Fxp(img_vmm_result, signed=True, n_word=param.word, n_frac=param.frac)
-            img.config.op_sizing = 'same'
+        # # NOTICE The fixed point result should be double size of operand
+        # real = Fxp(real_vmm_result, signed=True, n_word=param.word, n_frac=param.frac)
+        # real.config.op_sizing = 'same'
+
+        # # NOTICE The fixed point result should be double size of operand
+        # img = Fxp(img_vmm_result, signed=True, n_word=param.word, n_frac=param.frac)
+        # img.config.op_sizing = 'same'
+
+        vmm_result = real_vmm_result + img_vmm_result
 
         # combine real and img
-        reordered_rsv[:, 1] = real + img
+        reordered_rsv[:, 1] = vmm_result.flatten()
 
         # NOTICE The vmm result is Fxp object
         return reordered_rsv
@@ -112,16 +122,15 @@ class QPU:
         else:
             print("The target index is larger than the qubits range")
 
-        real_reordered_rsv = img_reordered_rsv = []
 
         # do the mvm operation according to the gate type
         if self.gate_type == 'one_qubit_gate':
             # reorder all rsv without changing the index
-            reordered_rsv = utils.reorder(self.stride, rsv)
+            reordered_rsv, reordered_ursv, n_stride = utils.reorder(self.stride, rsv, self.num_qubits)
             # print('one qubit: reordered_rsv\n', reordered_rsv)
 
             # do the matrix-vector multiplication
-            next_rsv = self.vmm(reordered_rsv)
+            next_rsv = self.vmm(reordered_rsv, n_stride)
 
             # remove the zero amplitude state
             try:
@@ -133,7 +142,7 @@ class QPU:
             next_rsv[:, 2] = False
             # print('QPU Output:: \n', next_rsv)
 
-            return next_rsv
+            return next_rsv[next_rsv[:, 0].argsort()]
 
         elif self.gate_type == 'two_qubit_gate':
             # initialize the empty list to store the realized states
@@ -144,7 +153,7 @@ class QPU:
 
             # convert the decimal control_qubit into the binary representation
             # if control qubit index is 1, the bin_control_qubit should be |010> (2nd => |100>)
-            bin_control_qubit = BitArray(uint=1 << self.control_qubit, length=self.num_qubits)
+            bin_control_qubit = BitArray(uint=1 << self.control_qubit, length=2**self.num_qubits)
 
             # make the empty index list for unrealized rsv
             realized_index = []
@@ -153,10 +162,10 @@ class QPU:
             # find the realized rsv
             for k in range(0, list(rsv.shape)[0]):
                 # extract the offset(=index)
-                offset = int(rsv[k][0])
+                offset = int(rsv[k][0].get_val())
 
                 # convert the decimal offset into the binary representation
-                bin_offset = BitArray(uint=offset, length=self.num_qubits)
+                bin_offset = BitArray(uint=offset, length=2**self.num_qubits)
 
                 # check the offset has the control index as 1
                 # ex) |010> & |000> = 0, |010> & |001> = 0, |010> & |010> > 0, ...
@@ -167,27 +176,34 @@ class QPU:
                 # when enable == 1, it means the qubit of control index on offset is '1' named 'realized'
                 if enable.uint > 0:
                     # add the realized index
-                    realized_index = np.append(realized_index, offset)
+                    realized_index = np.append(realized_index, k)
 
                     # add the realized rsv
-                    realized_rsv = np.append(realized_rsv, rsv[offset])
+                    realized_rsv = np.append(realized_rsv, rsv[k].get_val())
 
-                elif enable.uint == 0:
+                if enable.uint == 0:
                     # add the unrealized index
-                    unrealized_index = np.append(unrealized_rsv, offset)
+                    unrealized_index = np.append(unrealized_rsv, k)
 
                     # add the unrealized rsv
-                    unrealized_rsv = np.append(unrealized_rsv, rsv[offset])
+                    unrealized_rsv = np.append(unrealized_rsv, rsv[k].get_val())
 
-                else:
-                    print("Cannot check the realized states", cf.f_back.f_lineno)
+                # # when the control qubit is zero 
+                # elif enable.uint == 0 and offset == 0:
+                #     realized_index = np.append(realized_index, k)
 
-            reordered_rsv = utils.reorder(self.stride, realized_rsv)
+                #     realized_rsv = np.append(realized_rsv, rsv[k].get_val())
+
+
+            realized_rsv = Fxp(realized_rsv, signed=True, n_word=param.word, n_frac=param.frac)
+            unrealized_rsv = Fxp(unrealized_rsv, signed=True, n_word=param.word, n_frac=param.frac)
+
+            reordered_rsv, unrealized_rsv, n_stride = utils.reorder(self.stride, realized_rsv, self.num_qubits, unrealized_rsv)
             # print('two qubit: reordered\n', reordered_rsv)
 
-            next_rsv = self.vmm(reordered_rsv)
+            next_rsv = self.vmm(reordered_rsv, n_stride)
 
-            if len(unrealized_rsv) != 0:
+            if unrealized_rsv is not None:
                 # NOTICE Fxp object cannot implement np.vstack
                 # combine with unrealized rsv
                 next_rsv = np.vstack((next_rsv.get_val(), unrealized_rsv.get_val()))
@@ -197,13 +213,13 @@ class QPU:
 
                 next_rsv[:, 2] = False
 
-                return Fxp(next_rsv, signed=True, n_word=param.word, n_frac=param.frac)
+                return Fxp(next_rsv[next_rsv[:, 0].argsort()], signed=True, n_word=param.word, n_frac=param.frac)
 
             else:
                 # remove the zero amplitudes
                 next_rsv = next_rsv[np.where(next_rsv[:, 1] != 0)]
 
-                return next_rsv
+                return next_rsv[next_rsv[:, 0].argsort()]
 
         elif self.gate_type == 'three_qubit_gate':
             # initialize the empty list to store the realized states
@@ -214,8 +230,8 @@ class QPU:
 
             # convert the decimal control_qubit into the binary representation
             # if control qubit index is 1, the bin_control_qubit should be |010> (2nd => |100>)
-            bin_ccontrol_qubit = BitArray(uint=1 << self.ccontrol_qubit, length=self.num_qubits)
-            bin_control_qubit = BitArray(uint=1 << self.control_qubit, length=self.num_qubits)
+            bin_ccontrol_qubit = BitArray(uint=1 << self.ccontrol_qubit, length=2**self.num_qubits)
+            bin_control_qubit = BitArray(uint=1 << self.control_qubit, length=2**self.num_qubits)
 
             # make the empty index list for unrealized rsv
             realized_index = []
@@ -227,7 +243,7 @@ class QPU:
                 offset = int(rsv[k][0])
 
                 # convert the decimal offset into the binary representation
-                bin_offset = BitArray(uint=offset, length=self.num_qubits)
+                bin_offset = BitArray(uint=offset, length=2**self.num_qubits)
 
                 # check the offset has the control index as 1
                 # ex) |010> & |000> = 0, |010> & |001> = 0, |010> & |010> > 0, ...
@@ -254,7 +270,7 @@ class QPU:
                 else:
                     print("Cannot check the realized states", cf.f_back.f_lineno)
 
-            reordered_rsv = utils.reorder(self.stride, realized_rsv)
+            reordered_rsv, unrealized_rsv = utils.reorder(self.stride, realized_rsv, self.num_qubits, unrealized_rsv)
             # print('two qubit: reordered\n', reordered_rsv)
 
             next_rsv = self.vmm(reordered_rsv)

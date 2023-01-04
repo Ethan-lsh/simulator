@@ -20,29 +20,43 @@ crossbar_capacity = 1024 * 1024  # rows x columns
 N_burst = 512  # 64bytes burst write
 
 
-def square_magnitude(vector):
-    return sum(x*x for x in vector)
 
+def find_rs(rs, index, urs=None):
+    rs_index = np.where(rs[:, 0] == index)[0]
 
-def inaccuracy(pred, test):
-    return square_magnitude([pred[i] - test[i] for i in range(len(pred))]) / len(pred)
+    if urs is not None:
+        urs_index = np.where(urs[:, 0] == index)[0]
+    else:
+        urs_index = np.array([])
 
+    if rs_index.size > 0 and urs_index.size == 0:
+        if rs[rs_index, 2] == False:
+            rs[rs_index, 2] = True
+            return rs[rs_index].get_val(), urs
+        else:
+            return None, urs
 
-def find_rs(rs, index):
-    try:
-        value = np.where(rs[:, 0] == index)[0].real[0]
-        if (value >= 0) and (rs[value, 2] == False):
-            rs[value, 2] = True
-            return rs[value]
-    except IndexError:
-        t_rs = np.array([index, 0.0 + 0.0j, True])
-        return t_rs
+    elif rs_index.size == 0 and urs_index.size == 0:
+        return np.array([index, 0.0+0.0j, True]), urs
+
+    elif rs_index.size == 0 and urs_index.size > 0:
+        if urs[urs_index, 2] == False:
+            urs[urs_index] = True
+            t_rs = urs[urs_index]
+            d_urs = np.delete(urs, urs_index, axis=0)
+            return t_rs.get_val(), d_urs
+        else:
+            return None, urs
 
 
 # reorder the rsv of each qubit state according to the stride value
-def reorder(stride, realized_rsv):
+def reorder(stride, realized_rsv, n_qubits, unrealized_rsv=None):
     # reshape
     realized_rsv = np.reshape(realized_rsv, (-1, 3))
+
+    if unrealized_rsv is not None:
+        unrealized_rsv = np.reshape(unrealized_rsv, (-1, 3))
+
 
     length_of_rsv = realized_rsv.shape[0]
 
@@ -51,27 +65,42 @@ def reorder(stride, realized_rsv):
     for i in range(0, length_of_rsv):
         upper_index = lower_index = 0
 
-        upper_index = realized_rsv[i][0].real
-        upper_rsv = find_rs(realized_rsv, upper_index)
+        upper_index = int(realized_rsv[i][0].get_val())
+        upper_rsv, reordered_ursv = find_rs(realized_rsv, upper_index, unrealized_rsv)
 
         if upper_rsv is None or []:
             continue
 
+        if (upper_index + stride) >= 2**n_qubits:
+            stride = -stride
+        else:
+            stride = stride
+
         lower_index = upper_index + stride
-        lower_rsv = find_rs(realized_rsv, lower_index)
+        print(upper_index, lower_index, stride)
+
+        lower_rsv, reordered_ursv = find_rs(realized_rsv, lower_index, unrealized_rsv)
+        if lower_rsv is None or []:
+            continue
 
         # combine and store in reordered rsv
         if i == 0:
-            pair_rsv = np.vstack([[upper_rsv, lower_rsv]])
+            pair_rsv = np.vstack([upper_rsv, lower_rsv])
             reordered_rsv = pair_rsv
         elif i > 0:
-            pair_rsv = np.vstack([[reordered_rsv, upper_rsv, lower_rsv]])
+            pair_rsv = np.vstack([upper_rsv, lower_rsv])
+            reordered_rsv = np.concatenate((reordered_rsv, pair_rsv), axis=0)
+            # pair_rsv = np.vstack([[reordered_rsv, upper_rsv, lower_rsv]])
+            # reordered_rsv = pair_rsv
 
     # ! Make the Fxp object with 'same' precision
     reordered_rsv = Fxp(reordered_rsv, signed=True, n_word=param.word, n_frac=param.frac)
     reordered_rsv.config.const_op_sizing = 'same'
 
-    return reordered_rsv
+    reordered_ursv = Fxp(reordered_ursv, signed=True, n_word=param.word, n_frac=param.frac)
+    reordered_ursv.config.const_op_sizing = 'same'
+
+    return reordered_rsv, reordered_ursv, stride
 
 
 def find_matrix(inst):
