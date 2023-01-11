@@ -68,7 +68,8 @@ class QPU:
             print("The target index is larger than the qubits range")
 
     # matrix-vector multiplication function
-    def vmm(self, reordered_rsv, n_stride):
+    def vmm(self, reordered_rsv):
+        reordered_rsv = reordered_rsv.get_val()
         # divide the reordered rsv into real and imaginary vector
         real_reordered_rsv = reordered_rsv.real
         img_reordered_rsv = reordered_rsv.imag
@@ -80,13 +81,17 @@ class QPU:
         real = img = None
         real_vmm_result = img_vmm_result = np.array([], dtype=complex).reshape(0, 2)
         for j in range(0, column, 2):
+            amp = reordered_rsv[j:j+2]
+            amp = amp[amp[:, 0].argsort()]
+            real_amp = amp.real
+            img_amp = amp.imag
             # real_amp = real_reordered_rsv[j:j+2, 1]
-            real_amp = real_reordered_rsv[j:j+2]
-            real_amp = real_amp[real_amp[:, 0].argsort()]
+            # real_amp = real_reordered_rsv[j:j+2]
+            # real_amp = real_amp[real_amp[:, 0].argsort()]
 
             # img_amp = img_reordered_rsv[j:j+2, 1]
-            img_amp = img_reordered_rsv[j:j+2]
-            img_amp = img_amp[img_amp[:, 0].argsort()]
+            # img_amp = img_reordered_rsv[j:j+2]
+            # img_amp = img_amp[img_amp[:, 0].argsort()]
 
             # Extract the real part of result
             real_xbar_output = self.real_xbar.run_xbar_mvm(real_amp[:, 1]) - self.imag_xbar.run_xbar_mvm(img_amp[:, 1])
@@ -94,12 +99,15 @@ class QPU:
             # Extract the imaginary part of result
             img_xbar_output = self.real_xbar.run_xbar_mvm(img_amp[:, 1]) + self.imag_xbar.run_xbar_mvm(real_amp[:, 1])
             
-            if n_stride > 0:
-                real_vmm_result = np.vstack((real_vmm_result, real_xbar_output))
-                img_vmm_result = np.vstack((img_vmm_result, img_xbar_output))
-            else:
-                real_vmm_result = np.vstack((real_vmm_result, real_xbar_output[::-1]))
-                img_vmm_result = np.vstack((img_vmm_result, img_xbar_output[::-1]))
+            # if n_stride > 0:
+            #     real_vmm_result = np.vstack((real_vmm_result, real_xbar_output))
+            #     img_vmm_result = np.vstack((img_vmm_result, img_xbar_output))
+            # else:
+            real_vmm_result = np.vstack((real_vmm_result, real_xbar_output[::-1]))
+            img_vmm_result = np.vstack((img_vmm_result, img_xbar_output[::-1]))
+
+            # real_vmm_result = np.vstack((real_vmm_result, real_xbar_output))
+            # img_vmm_result = np.vstack((img_vmm_result, img_xbar_output))
 
         vmm_result = real_vmm_result + 1j * img_vmm_result
 
@@ -122,26 +130,26 @@ class QPU:
 
         reordered_rsv = []
 
-        stride = self.stride
-
         for i in range(0, length_of_rsv):
-            upper_index = lower_index = 0
+            lower_index = upper_index = 0
 
-            upper_index = int(realized_rsv[i][0].get_val())
-            upper_rsv, reordered_ursv = utils.find_rs(realized_rsv, upper_index, unrealized_rsv)
+            lower_index = int(realized_rsv[i][0].get_val())
+            # bin_lower_index = BitArray(uint=lower_index, length=self.num_qubits)
+            bin_lower_index = BitArray(uint=lower_index, length=param.word)
 
-            if upper_rsv is None or []:
-                continue
-
-            if (upper_index + stride) >= 2**self.num_qubits:
-                stride = -stride
+            if bin_lower_index.any(False, [(param.word - 1) - self.target_qubit]):
+                upper_index = lower_index + self.stride
             else:
-                stride = stride
-
-            lower_index = upper_index + stride
+                upper_index = lower_index
+                lower_index = upper_index - self.stride
 
             lower_rsv, reordered_ursv = utils.find_rs(realized_rsv, lower_index, unrealized_rsv)
+
             if lower_rsv is None or []:
+                continue
+
+            upper_rsv, reordered_ursv = utils.find_rs(realized_rsv, upper_index, unrealized_rsv)
+            if upper_rsv is None or []:
                 continue
 
             # combine and store in reordered rsv
@@ -161,7 +169,8 @@ class QPU:
         reordered_ursv = Fxp(reordered_ursv, signed=True, n_word=param.word, n_frac=param.frac)
         reordered_ursv.config.const_op_sizing = 'same'
 
-        return reordered_rsv, reordered_ursv, stride
+        # return with sorting
+        return reordered_rsv, reordered_ursv
 
     # qubit gate operation depends on the gate type
     def quantum_gate_process(self, rsv):
@@ -175,11 +184,11 @@ class QPU:
         # do the mvm operation according to the gate type
         if self.gate_type == 'one_qubit_gate':
             # reorder all rsv without changing the index
-            reordered_rsv, reordered_ursv, n_stride = self.reorder(rsv)
+            reordered_rsv, reordered_ursv = self.reorder(rsv)
             # print('one qubit: reordered_rsv\n', reordered_rsv)
 
             # do the matrix-vector multiplication
-            next_rsv = self.vmm(reordered_rsv, n_stride)
+            next_rsv = self.vmm(reordered_rsv)
 
             # remove the zero amplitude state
             try:
@@ -191,7 +200,7 @@ class QPU:
             next_rsv[:, 2] = False
             # print('QPU Output:: \n', next_rsv)
 
-            return next_rsv[next_rsv[:, 0].argsort()]
+            return Fxp(next_rsv[next_rsv[:, 0].argsort()], signed=True, n_word=param.word, n_frac=param.frac)
 
         elif self.gate_type == 'two_qubit_gate':
             # initialize the empty list to store the realized states
@@ -222,7 +231,7 @@ class QPU:
 
                 # enable = 1 if rsv[offset][1] > 0 else 0
 
-                # when enable == 1, it means the qubit of control index on offset is '1' named 'realized'
+                # if the control qubit is |1>
                 if enable.uint > 0:
                     # add the realized index
                     realized_index = np.append(realized_index, k)
@@ -240,22 +249,21 @@ class QPU:
                 else:
                     continue
 
-
             if len(realized_rsv) == 0:
                 return Fxp(unrealized_rsv.reshape((-1, 3)), signed=True, n_word=param.word, n_frac=param.frac)
             else:
                 realized_rsv = Fxp(realized_rsv, signed=True, n_word=param.word, n_frac=param.frac)
                 unrealized_rsv = Fxp(unrealized_rsv, signed=True, n_word=param.word, n_frac=param.frac)
-                reordered_rsv, unrealized_rsv, n_stride = self.reorder(realized_rsv, unrealized_rsv)
+                reordered_rsv, reordered_ursv = self.reorder(realized_rsv, unrealized_rsv)
             # print('two qubit: reordered\n', reordered_rsv)
 
             # Do the matrix-vector multiplication
-            next_rsv = self.vmm(reordered_rsv, n_stride)
+            next_rsv = self.vmm(reordered_rsv)
 
-            if unrealized_rsv is not None:
+            if reordered_ursv is not None:
                 # NOTICE Fxp object cannot implement np.vstack
                 # combine with unrealized rsv
-                next_rsv = np.vstack((next_rsv.get_val(), unrealized_rsv.get_val()))
+                next_rsv = np.vstack((next_rsv, reordered_ursv.get_val()))
 
                 # remove the zero amplitudes
                 next_rsv = next_rsv[~np.any(next_rsv[:, 1].reshape((-1, 1)) == 0, axis=1)]
@@ -291,7 +299,7 @@ class QPU:
             # find the realized rsv
             for k in range(0, list(rsv.shape)[0]):
                 # extract the offset(=index)
-                offset = int(rsv[k][0])
+                offset = int(rsv[k][0].get_val())
 
                 # convert the decimal offset into the binary representation
                 bin_offset = BitArray(uint=offset, length=2**self.num_qubits)
@@ -304,43 +312,39 @@ class QPU:
                 # enable = 1 if rsv[offset][1] > 0 else 0
 
                 # when enable == 1, it means the qubit of control index on offset is '1' named 'realized'
-                if enable.uint > 0 & eenable.uint > 0:
+                if enable.uint > 0 and eenable.uint > 0:
                     # add the realized index
-                    realized_index = np.append(realized_index, offset)
+                    realized_index = np.append(realized_index, k)
 
                     # add the realized rsv
-                    realized_rsv = np.append(realized_rsv, rsv[offset])
+                    realized_rsv = np.append(realized_rsv, rsv[k].get_val())
 
-                elif enable.uint == 0 & eenable.uint == 0:
+                elif (enable.uint > 0 & eenable.uint == 0) \
+                    or (enable.uint == 0 & eenable.uint > 0) \
+                    or (enable.uint == 0 & eenable.uint == 0) :
                     # add the unrealized index
-                    unrealized_index = np.append(unrealized_rsv, offset)
+                    unrealized_index = np.append(unrealized_rsv, k)
 
                     # add the unrealized rsv
-                    unrealized_rsv = np.append(unrealized_rsv, rsv[offset])
+                    unrealized_rsv = np.append(unrealized_rsv, rsv[k].get_val())
 
                 else:
-                    print("Cannot check the realized states", cf.f_back.f_lineno)
-
-            reordered_rsv, unrealized_rsv = utils.reorder(self.stride, realized_rsv, self.num_qubits, unrealized_rsv)
-            # print('two qubit: reordered\n', reordered_rsv)
-
-            # Do the matrix-vector multiplication
-            next_rsv = self.vmm(reordered_rsv)
+                    continue
 
             if len(realized_rsv) == 0:
                 return Fxp(unrealized_rsv.reshape((-1, 3)), signed=True, n_word=param.word, n_frac=param.frac)
             else:
                 realized_rsv = Fxp(realized_rsv, signed=True, n_word=param.word, n_frac=param.frac)
                 unrealized_rsv = Fxp(unrealized_rsv, signed=True, n_word=param.word, n_frac=param.frac)
-                reordered_rsv, unrealized_rsv, n_stride = self.reorder(realized_rsv, unrealized_rsv)
-            # print('two qubit: reordered\n', reordered_rsv)
+                reordered_rsv, reordered_ursv = self.reorder(realized_rsv, unrealized_rsv)
 
-            next_rsv = self.vmm(reordered_rsv, n_stride)
+            # Do the matrix-vector multiplication
+            next_rsv = self.vmm(reordered_rsv)
 
-            if unrealized_rsv is not None:
+            if reordered_ursv is not None:
                 # NOTICE Fxp object cannot implement np.vstack
                 # combine with unrealized rsv
-                next_rsv = np.vstack((next_rsv.get_val(), unrealized_rsv.get_val()))
+                next_rsv = np.vstack((next_rsv, reordered_ursv.get_val()))
 
                 # remove the zero amplitudes
                 next_rsv = next_rsv[~np.any(next_rsv[:, 1].reshape((-1, 1)) == 0, axis=1)]

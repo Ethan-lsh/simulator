@@ -82,8 +82,8 @@ def find_matrix(inst):
     else:
         print('Error: No matched param')
 
-    # print(gate_name)
     matrix = gate.to_matrix()
+    # print('matrix \n', matrix, end='\n')
     return matrix
 
 
@@ -106,6 +106,7 @@ def eval_qiskit(qc, num_of_cores, processor_type="CPU"):
     result = job.result()
     counts = result.get_counts()
     print("#### CPU (s) ####")
+    print(counts)
     print(result.time_taken, end='\n')
 
 
